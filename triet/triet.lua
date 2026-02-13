@@ -56,8 +56,16 @@ local Config = {
     
     -- Cài đặt UI
     Minimized = false,
-    ShowNotifications = true
+    ShowNotifications = true,
+    
+    -- Cài đặt tối ưu
+    TeleportTimeout = 10,
+    SearchInterval = 0.5,
+    MaxSearchDistance = 500
 }
+
+-- Biến dừng khẩn cấp
+_G.StopFarm = false
 
 -- Dữ liệu nhiệm vụ theo cấp độ
 local QuestData = {
@@ -142,11 +150,19 @@ local function getPlayerLevel()
     return 1
 end
 
--- Lấy avatar người chơi chính xác
+-- Lấy avatar người chơi chính xác (hỗ trợ cả Rayfield và UI dự phòng)
 local function getPlayerAvatar()
     local success, avatarImage = pcall(function()
-        return Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+        -- Thử phương pháp mới với rbxthumb://
+        return "rbxthumb://type=avatar&id=" .. player.UserId .. "&w=150&h=150"
     end)
+    
+    if not success then
+        success, avatarImage = pcall(function()
+            -- Phương pháp dự phòng
+            return Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+        end)
+    end
     
     if success then
         return avatarImage
@@ -155,17 +171,28 @@ local function getPlayerAvatar()
     end
 end
 
--- Teleport mượt mà với TweenService (anti-kick)
+-- Teleport mượt mà với TweenService (anti-kick) và timeout
 local function smoothTeleport(position)
-    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return false end
     
     local humanoidRootPart = character.HumanoidRootPart
     local distance = (humanoidRootPart.Position - position.Position).Magnitude
+    local startTime = tick()
+    local timeout = Config.TeleportTimeout
     
     -- Nếu khoảng cách quá xa, chia thành nhiều bước nhỏ
     if distance > 1000 then
         local steps = math.ceil(distance / 500)
         for i = 1, steps do
+            -- Kiểm tra timeout
+            if tick() - startTime > timeout then
+                warn("Teleport timeout - đang dừng")
+                return false
+            end
+            
+            -- Kiểm tra dừng khẩn cấp
+            if _G.StopFarm then return false end
+            
             local progress = i / steps
             local targetPos = humanoidRootPart.Position:Lerp(position.Position, progress)
             local targetCFrame = CFrame.new(targetPos, position.Position)
@@ -180,8 +207,26 @@ local function smoothTeleport(position)
                 CFrame = targetCFrame
             })
             tween:Play()
-            tween.Completed:Wait()
             
+            -- Đợi với timeout
+            local completed = false
+            local connection
+            connection = tween.Completed:Connect(function()
+                completed = true
+                if connection then connection:Disconnect() end
+            end)
+            
+            local waitTime = 0
+            while not completed and waitTime < timeout do
+                task.wait(0.1)
+                waitTime = waitTime + 0.1
+                if _G.StopFarm then
+                    if connection then connection:Disconnect() end
+                    return false
+                end
+            end
+            
+            if connection then connection:Disconnect() end
             safeTaskWait(100, 300) -- Delay nhỏ giữa các bước
         end
     else
@@ -196,15 +241,89 @@ local function smoothTeleport(position)
             CFrame = position
         })
         tween:Play()
-        tween.Completed:Wait()
+        
+        -- Đợi với timeout
+        local completed = false
+        local connection
+        connection = tween.Completed:Connect(function()
+            completed = true
+            if connection then connection:Disconnect() end
+        end)
+        
+        local waitTime = 0
+        while not completed and waitTime < timeout do
+            task.wait(0.1)
+            waitTime = waitTime + 0.1
+            if _G.StopFarm then
+                if connection then connection:Disconnect() end
+                return false
+            end
+        end
+        
+        if connection then connection:Disconnect() end
     end
+    
+    return true
 end
 
--- Tìm NPC nhiệm vụ
+-- Tối ưu tìm kiếm NPC - chỉ tìm trong các thư mục cụ thể
 local function findQuestNPC(npcName)
-    for _, obj in pairs(Workspace:GetDescendants()) do
-        if obj.Name == npcName and obj:IsA("Model") and obj:FindFirstChild("HumanoidRootPart") then
-            return obj
+    -- Các thư mục cần tìm kiếm
+    local searchLocations = {
+        Workspace:FindFirstChild("NPCs"),
+        Workspace:FindFirstChild("QuestNPCs"),
+        Workspace:FindFirstChild("Map"):FindFirstChild("NPCs"),
+        Workspace
+    }
+    
+    for _, location in pairs(searchLocations) do
+        if location then
+            for _, obj in pairs(location:GetDescendants()) do
+                if obj.Name == npcName and obj:IsA("Model") and obj:FindFirstChild("HumanoidRootPart") then
+                    return obj
+                end
+            end
+        end
+    end
+    return nil
+end
+
+-- Tối ưu tìm kiếm NPC bán chip Raid
+local function findRaidChipNPC()
+    local searchLocations = {
+        Workspace:FindFirstChild("NPCs"),
+        Workspace:FindFirstChild("Raid"),
+        Workspace:FindFirstChild("Map"):FindFirstChild("NPCs"),
+        Workspace
+    }
+    
+    for _, location in pairs(searchLocations) do
+        if location then
+            for _, obj in pairs(location:GetDescendants()) do
+                if obj.Name == "RaidChip" or obj.Name == "Microchip" or obj.Name == "ChipDealer" then
+                    return obj
+                end
+            end
+        end
+    end
+    return nil
+end
+
+-- Tối ưu tìm kiếm cổng Raid
+local function findRaidPortal()
+    local searchLocations = {
+        Workspace:FindFirstChild("Raid"),
+        Workspace:FindFirstChild("Map"):FindFirstChild("Raid"),
+        Workspace
+    }
+    
+    for _, location in pairs(searchLocations) do
+        if location then
+            for _, obj in pairs(location:GetDescendants()) do
+                if obj.Name == "RaidPortal" or obj.Name == "RaidEntrance" or obj.Name == "MysteriousDoor" then
+                    return obj
+                end
+            end
         end
     end
     return nil
@@ -221,32 +340,74 @@ local function acceptQuest(questData)
     smoothTeleport(questData.location)
     safeTaskWait(Config.QuestDelay.min, Config.QuestDelay.max)
     
-    -- Nhận nhiệm vụ
+    -- Nhận nhiệm vụ với nhiều phương pháp
     fireclickdetector(npc:FindFirstChildOfClass("ClickDetector"))
     
-    -- Phương pháp thay thế: sử dụng remote events
-    local questRemote = ReplicatedStorage:FindFirstChild("Remotes"):FindFirstChild("Quests")
-    if questRemote then
-        pcall(function()
-            questRemote:InvokeServer("AcceptQuest", questData.npc)
-        end)
+    -- Thử các remote events khác nhau
+    local questRemotes = {
+        ReplicatedStorage:FindFirstChild("Remotes"):FindFirstChild("Quests"),
+        ReplicatedStorage:FindFirstChild("Remotes"):FindFirstChild("Quest"),
+        ReplicatedStorage:FindFirstChild("Quests"),
+        ReplicatedStorage:FindFirstChild("Quest")
+    }
+    
+    for _, remote in pairs(questRemotes) do
+        if remote then
+            pcall(function()
+                remote:InvokeServer("AcceptQuest", questData.npc)
+                remote:InvokeServer("StartQuest", questData.npc)
+                remote:FireServer("AcceptQuest", questData.npc)
+            end)
+        end
     end
     
     currentQuest = questData
     return true
 end
 
--- Tìm kẻ địch trong phạm vi
+-- Tối ưu tìm kiếm kẻ địch - chỉ tìm trong các thư mục cụ thể
 local function findEnemies(enemyName, range)
     local enemies = {}
-    for _, obj in pairs(Workspace:GetDescendants()) do
-        if obj:IsA("Model") and string.find(obj.Name, enemyName) and obj:FindFirstChild("Humanoid") then
-            local humanoid = obj.Humanoid
-            -- Kiểm tra máu của quái vật trước khi thêm vào danh sách
-            if humanoid and humanoid.Health > 0 then
-                local distance = (character.HumanoidRootPart.Position - obj.PrimaryPart.Position).Magnitude
-                if distance <= range then
-                    table.insert(enemies, {model = obj, distance = distance, humanoid = humanoid})
+    local playerPos = character.HumanoidRootPart.Position
+    
+    -- Các thư mục cần tìm kiếm
+    local searchLocations = {
+        Workspace:FindFirstChild("Enemies"),
+        Workspace:FindFirstChild("Mobs"),
+        Workspace:FindFirstChild("Map"):FindFirstChild("Enemies"),
+        Workspace:FindFirstChild("Map"):FindFirstChild("Mobs")
+    }
+    
+    -- Nếu không tìm thấy thư mục cụ thể, tìm trong một phạm vi giới hạn
+    local foundInSpecificFolders = false
+    for _, location in pairs(searchLocations) do
+        if location then
+            for _, obj in pairs(location:GetDescendants()) do
+                if obj:IsA("Model") and string.find(obj.Name, enemyName) and obj:FindFirstChild("Humanoid") then
+                    local humanoid = obj.Humanoid
+                    -- Kiểm tra máu của quái vật trước khi thêm vào danh sách
+                    if humanoid and humanoid.Health > 0 then
+                        local distance = (playerPos - obj.PrimaryPart.Position).Magnitude
+                        if distance <= range then
+                            table.insert(enemies, {model = obj, distance = distance, humanoid = humanoid})
+                            foundInSpecificFolders = true
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    -- Nếu không tìm thấy trong thư mục cụ thể, tìm trong phạm vi giới hạn của Workspace
+    if not foundInSpecificFolders then
+        for _, obj in pairs(Workspace:GetDescendants()) do
+            if obj:IsA("Model") and string.find(obj.Name, enemyName) and obj:FindFirstChild("Humanoid") then
+                local humanoid = obj.Humanoid
+                if humanoid and humanoid.Health > 0 then
+                    local distance = (playerPos - obj.PrimaryPart.Position).Magnitude
+                    if distance <= math.min(range, Config.MaxSearchDistance) then
+                        table.insert(enemies, {model = obj, distance = distance, humanoid = humanoid})
+                    end
                 end
             end
         end
@@ -327,20 +488,30 @@ local function autoCastSkills()
     
     local skills = {"Z", "X", "C", "V"}
     for _, skill in pairs(skills) do
-        local skillRemote = ReplicatedStorage:FindFirstChild("Remotes"):FindFirstChild("Skills")
-        if skillRemote then
-            pcall(function()
-                -- Sử dụng Mouse.Hit.p để điều hướng chiêu thức
-                local targetPos = aimbotTarget.HumanoidRootPart.Position
-                skillRemote:FireServer("UseSkill", skill, targetPos)
-            end)
+        -- Thử nhiều phương pháp remote khác nhau
+        local skillRemotes = {
+            ReplicatedStorage:FindFirstChild("Remotes"):FindFirstChild("Skills"),
+            ReplicatedStorage:FindFirstChild("Remotes"):FindFirstChild("Combat"),
+            ReplicatedStorage:FindFirstChild("Skills"),
+            ReplicatedStorage:FindFirstChild("Combat")
+        }
+        
+        for _, remote in pairs(skillRemotes) do
+            if remote then
+                pcall(function()
+                    -- Sử dụng Mouse.Hit.p để điều hướng chiêu thức
+                    local targetPos = aimbotTarget.HumanoidRootPart.Position
+                    remote:FireServer("UseSkill", skill, targetPos)
+                    remote:FireServer(skill, targetPos)
+                end)
+            end
         end
     end
     
     lastSkillTime = tick()
 end
 
--- Tấn công kẻ địch
+-- Tấn công kẻ địch (hỗ trợ cả Mobile)
 local function attackEnemy(enemy)
     if not enemy or not enemy:FindFirstChild("Humanoid") then
         return false
@@ -352,22 +523,46 @@ local function attackEnemy(enemy)
         return false
     end
     
+    -- Kiểm tra dừng khẩn cấp
+    if _G.StopFarm then return false end
+    
     -- Di chuyển đến vị trí tấn công
     local attackPos = enemy.PrimaryPart.Position + Vector3.new(0, 5, 0)
     character.HumanoidRootPart.CFrame = CFrame.new(attackPos)
     
-    -- Tấn công với Magical Melee
-    local combatRemote = ReplicatedStorage:FindFirstChild("Remotes"):FindFirstChild("Combat")
-    if combatRemote then
+    -- Tấn công với nhiều phương pháp
+    local combatRemotes = {
+        ReplicatedStorage:FindFirstChild("Remotes"):FindFirstChild("Combat"),
+        ReplicatedStorage:FindFirstChild("Remotes"):FindFirstChild("Melee"),
+        ReplicatedStorage:FindFirstChild("Combat"),
+        ReplicatedStorage:FindFirstChild("Melee")
+    }
+    
+    for _, remote in pairs(combatRemotes) do
+        if remote then
+            pcall(function()
+                remote:FireServer("MouseClick", enemy.HumanoidRootPart)
+                remote:FireServer("Attack", enemy.HumanoidRootPart)
+            end)
+        end
+    end
+    
+    -- Hỗ trợ Mobile với VirtualInputManager
+    local VirtualInputManager = game:GetService("VirtualInputManager")
+    if VirtualInputManager then
         pcall(function()
-            combatRemote:FireServer("MouseClick", enemy.HumanoidRootPart)
+            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+            task.wait(getRandomDelay(Config.AttackDelay.min, Config.AttackDelay.max))
+            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
         end)
     end
     
-    -- Click chuột ảo
-    VirtualUser:Button1Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
-    safeTaskWait(Config.AttackDelay.min, Config.AttackDelay.max)
-    VirtualUser:Button1Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+    -- Click chuột ảo (phương pháp dự phòng)
+    pcall(function()
+        VirtualUser:Button1Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+        safeTaskWait(Config.AttackDelay.min, Config.AttackDelay.max)
+        VirtualUser:Button1Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+    end)
     
     return true
 end
@@ -406,13 +601,24 @@ end
 local function buyRaidChip()
     if not Config.AutoBuyChip then return false end
     
-    -- Tìm NPC bán chip Raid
-    for _, obj in pairs(Workspace:GetDescendants()) do
-        if obj.Name == "RaidChip" or obj.Name == "Microchip" then
-            -- Mua chip (cần điều chỉnh theo game cụ thể)
-            fireclickdetector(obj:FindFirstChildOfClass("ClickDetector"))
-            return true
+    local chipNPC = findRaidChipNPC()
+    if chipNPC then
+        -- Di chuyển đến NPC
+        smoothTeleport(chipNPC.CFrame)
+        safeTaskWait(1000, 2000)
+        
+        -- Thử mua chip
+        fireclickdetector(chipNPC:FindFirstChildOfClass("ClickDetector"))
+        
+        -- Thử phương pháp khác
+        local buyRemote = ReplicatedStorage:FindFirstChild("Remotes"):FindFirstChild("BuyRaidChip")
+        if buyRemote then
+            pcall(function()
+                buyRemote:InvokeServer()
+            end)
         end
+        
+        return true
     end
     return false
 end
@@ -422,14 +628,26 @@ local function startRaid()
     if raidActive then return end
     
     if buyRaidChip() then
-        -- Tìm phòng Raid
-        for _, obj in pairs(Workspace:GetDescendants()) do
-            if obj.Name == "RaidPortal" or obj.Name == "RaidEntrance" then
-                smoothTeleport(obj.CFrame)
-                fireclickdetector(obj:FindFirstChildOfClass("ClickDetector"))
-                raidActive = true
-                return true
+        safeTaskWait(1000, 2000)
+        
+        local portal = findRaidPortal()
+        if portal then
+            smoothTeleport(portal.CFrame)
+            safeTaskWait(1000, 2000)
+            
+            -- Thử vào portal
+            fireclickdetector(portal:FindFirstChildOfClass("ClickDetector"))
+            
+            -- Thử phương pháp khác
+            local raidRemote = ReplicatedStorage:FindFirstChild("Remotes"):FindFirstChild("StartRaid")
+            if raidRemote then
+                pcall(function()
+                    raidRemote:InvokeServer()
+                end)
             end
+            
+            raidActive = true
+            return true
         end
     end
     return false
@@ -437,15 +655,15 @@ end
 
 -- Tự động tiêu diệt quái trong Raid
 local function autoRaidFarm()
-    if not raidActive or not Config.AutoRaid then return end
+    if not raidActive or not Config.AutoRaid or _G.StopFarm then return end
     
-    -- Tìm quái Raid
+    -- Tìm quái Raid và boss
     for _, obj in pairs(Workspace:GetDescendants()) do
-        if obj:IsA("Model") and (string.find(obj.Name, "Raid") or string.find(obj.Name, "Boss")) then
+        if obj:IsA("Model") and (string.find(obj.Name, "Raid") or string.find(obj.Name, "Boss") or string.find(obj.Name, "Enemy")) then
             if obj:FindFirstChild("Humanoid") then
                 local humanoid = obj.Humanoid
                 if humanoid and humanoid.Health > 0 then
-                    -- Tấn công boss Raid
+                    -- Tấn công quái Raid
                     local distance = (character.HumanoidRootPart.Position - obj.PrimaryPart.Position).Magnitude
                     if distance <= Config.AttackRange then
                         attackEnemy(obj)
@@ -455,13 +673,27 @@ local function autoRaidFarm()
             end
         end
     end
+    
+    -- Kiểm tra xem raid đã kết thúc chưa
+    local raidEnemies = 0
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("Model") and (string.find(obj.Name, "Raid") or string.find(obj.Name, "Boss")) then
+            if obj:FindFirstChild("Humanoid") and obj.Humanoid.Health > 0 then
+                raidEnemies = raidEnemies + 1
+            end
+        end
+    end
+    
+    if raidEnemies == 0 then
+        raidActive = false
+    end
 end
 
 -- === LOGIC AUTO FARM CHÍNH ===
 
 -- Logic farm hoàn chỉnh: Quest -> Teleport -> Gom quái -> Đánh quái
 local function autoFarm()
-    if not Config.AutoFarm then return end
+    if not Config.AutoFarm or _G.StopFarm then return end
     
     -- Bước 1: Nhận nhiệm vụ nếu cần
     if Config.AutoQuest and not currentQuest then
@@ -805,6 +1037,14 @@ end)
 
 -- Vòng lặp chính
 RunService.Heartbeat:Connect(function()
+    -- Kiểm tra dừng khẩn cấp
+    if _G.StopFarm then
+        -- Reset trạng thái khi dừng
+        isAttacking = false
+        currentTarget = nil
+        return
+    end
+    
     -- Auto Farm logic hoàn chỉnh
     autoFarm()
     
@@ -818,12 +1058,14 @@ RunService.Heartbeat:Connect(function()
     -- Cập nhật UI đơn giản
     if infoLabel then
         local status = Config.AutoFarm and "Đang farm" or "Đang chờ"
+        if _G.StopFarm then status = "Đã dừng" end
         local quest = currentQuest and currentQuest.enemy or "Không có"
         local target = currentTarget and currentTarget.Name or "Không có"
         
         infoLabel.Text = "Trạng thái: " .. status .. 
                         "\nNhiệm vụ: " .. quest ..
-                        "\nMục tiêu: " .. target
+                        "\nMục tiêu: " .. target ..
+                        "\n\n⚠️ Gõ _G.StopFarm = true để dừng"
     end
 end)
 
@@ -833,4 +1075,7 @@ print("🎯 Tính năng: Auto Farm, Teleport, Raid, Aim Chiêu")
 print("🌍 Giao diện Tiếng Việt đầy đủ")
 print("⌨️ Nhấn Left/Right Control để thu gọn/mở menu")
 print("🛡️ Chế độ an toàn đã được bật")
+print("📱 Hỗ trợ Mobile với VirtualInputManager")
+print("⚡ Tối ưu tìm kiếm trong thư mục cụ thể")
+print("🚨 Dừng khẩn cấp: Gõ _G.StopFarm = true")
 print("🍊 Chúc bạn farm vui vẻ!")
