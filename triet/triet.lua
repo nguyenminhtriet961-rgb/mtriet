@@ -1,7 +1,7 @@
 --[[
-    TRIET HUB - ULTIMATE DROPDOWN VERSION 2026
-    Owner: NGUYỄN MINH TRIẾT
-    Features: Avatar Toggle, Dropdown Menu, Sea 1 Teleports, Aimbot, Auto Attack
+    TRIET HUB - PHIÊN BẢN VIỆT HÓA 2026
+    Chủ sở hữu: NGUYỄN MINH TRIẾT
+    Tính năng: Avatar Toggle, Dropdown Menu, Full Sea 1-2-3, Fast & Long Attack, Fix Aimbot
 ]]
 
 local Players = game:GetService("Players")
@@ -18,151 +18,179 @@ local Mouse = LocalPlayer:GetMouse()
 local Settings = {
     AimbotEnabled = false,
     AutoAttackEnabled = false,
+    FastAttack = true, -- Đánh nhanh
+    AttackRange = 30, -- Đánh xa (Studs)
     MaxDistance = 500,
-    PredictionFactor = 0.13,
-    AimbotKeybinds = {Enum.KeyCode.Z, Enum.KeyCode.X, Enum.KeyCode.C, Enum.KeyCode.V, Enum.UserInputType.MouseButton1},
-    TeleportSpeed = 300
+    Prediction = 0.15,
+    TeleportSpeed = 350
 }
 
--- Tọa độ Sea 1 chuẩn
-local Sea1Locations = {
-    ["Starter Island"] = CFrame.new(973, 16, 1413),
-    ["Jungle (Đảo Khỉ)"] = CFrame.new(-1612, 37, 149),
-    ["Pirate Village"] = CFrame.new(-1146, 22, 3814),
-    ["Desert (Sa Mạc)"] = CFrame.new(1094, 6, 4400),
-    ["Frozen Village"] = CFrame.new(1386, 87, -1298),
-    ["Marineford"] = CFrame.new(-2448, 73, 3999),
-    ["Skypiea (Đảo Trời)"] = CFrame.new(-4839, 717, -2622),
-    ["Prison (Nhà Ngục)"] = CFrame.new(4875, 5, 745),
-    ["Magma Village"] = CFrame.new(-5242, 8, 8462)
+-- Tọa độ các Sea
+local Locations = {
+    ["Sea 1"] = {
+        ["Đảo Khởi Đầu"] = CFrame.new(973, 16, 1413),
+        ["Đảo Khỉ (Jungle)"] = CFrame.new(-1612, 37, 149),
+        ["Làng Hải Tặc"] = CFrame.new(-1146, 22, 3814),
+        ["Sa Mạc"] = CFrame.new(1094, 6, 4400),
+        ["Đảo Tuyết"] = CFrame.new(1386, 87, -1298),
+        ["Đảo Trời (Sky)"] = CFrame.new(-4839, 717, -2622),
+        ["Nhà Ngục (Prison)"] = CFrame.new(4875, 5, 745)
+    },
+    ["Sea 2"] = {
+        ["Vương Quốc Rose"] = CFrame.new(-424, 73, 1836),
+        ["Đảo Ussop"] = CFrame.new(-2062, 37, -592),
+        ["Green Bit"] = CFrame.new(-2435, 73, -3158),
+        ["Nghĩa Địa (Graveyard)"] = CFrame.new(-5422, 14, -750),
+        ["Đảo Tuyết (Hot/Cold)"] = CFrame.new(-6061, 15, -4902)
+    },
+    ["Sea 3"] = {
+        ["Dinh Thự (Mansion)"] = CFrame.new(-12463, 375, -7551),
+        ["Đảo Phụ Nữ (Hydra)"] = CFrame.new(5756, 610, -253),
+        ["Đảo Rùa (Turtle)"] = CFrame.new(-13274, 532, -7583),
+        ["Lâu Đài Trên Không"] = CFrame.new(-11843, 807, -1521)
+    }
 }
 
--- =================== GIAO DIỆN (GUI) ===================
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "TrietHub_Ultimate"
-ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+-- =================== GIAO DIỆN (VIỆT HÓA) ===================
+local ScreenGui = Instance.new("ScreenGui", LocalPlayer.PlayerGui)
+ScreenGui.Name = "TrietHub_Pro"
 ScreenGui.ResetOnSpawn = false
 
--- 1. Nút Avatar Toggle
-local AvatarBtn = Instance.new("ImageButton")
+-- Nút Avatar
+local AvatarBtn = Instance.new("ImageButton", ScreenGui)
 AvatarBtn.Size = UDim2.new(0, 65, 0, 65)
 AvatarBtn.Position = UDim2.new(0, 20, 0.5, -32)
 AvatarBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 AvatarBtn.Image = "https://www.roblox.com/headshot-thumbnail/image?userId="..LocalPlayer.UserId.."&width=420&height=420&format=png"
-AvatarBtn.Parent = ScreenGui
 Instance.new("UICorner", AvatarBtn).CornerRadius = UDim.new(1, 0)
-local Stroke = Instance.new("UIStroke", AvatarBtn)
-Stroke.Color = Color3.fromRGB(163, 106, 255); Stroke.Thickness = 2
+Instance.new("UIStroke", AvatarBtn).Color = Color3.fromRGB(163, 106, 255)
 
--- 2. Khung Menu Chính
-local MainFrame = Instance.new("Frame")
+-- Khung Chính
+local MainFrame = Instance.new("Frame", ScreenGui)
 MainFrame.Size = UDim2.new(0, 550, 0, 0)
 MainFrame.Position = UDim2.new(0.5, -275, 0.5, -175)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 MainFrame.ClipsDescendants = true
 MainFrame.Visible = false
-MainFrame.Parent = ScreenGui
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
--- Sidebar & Content
+-- Sidebar
 local Sidebar = Instance.new("Frame", MainFrame)
 Sidebar.Size = UDim2.new(0, 140, 1, 0); Sidebar.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
 
-local HubTitle = Instance.new("TextLabel", Sidebar)
-HubTitle.Size = UDim2.new(1, 0, 0, 60); HubTitle.Text = "TRIET HUB"; HubTitle.TextColor3 = Color3.fromRGB(163, 106, 255); HubTitle.Font = Enum.Font.GothamBold; HubTitle.TextSize = 20; HubTitle.BackgroundTransparency = 1
+local Title = Instance.new("TextLabel", Sidebar)
+Title.Size = UDim2.new(1, 0, 0, 60); Title.Text = "TRIET HUB"; Title.TextColor3 = Color3.fromRGB(163, 106, 255); Title.Font = Enum.Font.GothamBold; Title.TextSize = 22; Title.BackgroundTransparency = 1
 
 local Content = Instance.new("ScrollingFrame", MainFrame)
 Content.Size = UDim2.new(1, -155, 1, -20); Content.Position = UDim2.new(0, 150, 0, 10); Content.BackgroundTransparency = 1; Content.ScrollBarThickness = 2
+Instance.new("UIListLayout", Content).Padding = UDim.new(0, 8)
 
-local Layout = Instance.new("UIListLayout", Content)
-Layout.Padding = UDim.new(0, 8)
+-- =================== HÀM CHỨC NĂNG ===================
 
--- =================== HÀM HỖ TRỢ (UTILITIES) ===================
-
-local function TweenTeleport(targetCFrame)
+local function TweenTP(cf)
     local char = LocalPlayer.Character
     if char and char:FindFirstChild("HumanoidRootPart") then
-        local dist = (char.HumanoidRootPart.Position - targetCFrame.Position).Magnitude
-        local info = TweenInfo.new(dist / Settings.TeleportSpeed, Enum.EasingStyle.Linear)
-        TweenService:Create(char.HumanoidRootPart, info, {CFrame = targetCFrame}):Play()
+        local dist = (char.HumanoidRootPart.Position - cf.Position).Magnitude
+        TweenService:Create(char.HumanoidRootPart, TweenInfo.new(dist/Settings.TeleportSpeed, Enum.EasingStyle.Linear), {CFrame = cf * CFrame.new(0,50,0)}):Play()
     end
 end
 
--- Hàm tạo Dropdown chuyên nghiệp
-local function CreateDropdown(parent, text)
-    local Frame = Instance.new("Frame", parent)
+local function CreateDropdown(text)
+    local Frame = Instance.new("Frame", Content)
     Frame.Size = UDim2.new(1, -10, 0, 40); Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25); Frame.ClipsDescendants = true
-    Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 8)
-
+    Instance.new("UICorner", Frame)
+    
     local Btn = Instance.new("TextButton", Frame)
     Btn.Size = UDim2.new(1, 0, 0, 40); Btn.Text = "▼  " .. text; Btn.TextColor3 = Color3.new(1, 1, 1); Btn.Font = Enum.Font.GothamBold; Btn.BackgroundTransparency = 1
 
     local Container = Instance.new("Frame", Frame)
     Container.Size = UDim2.new(1, 0, 0, 0); Container.Position = UDim2.new(0, 0, 0, 40); Container.BackgroundTransparency = 1
-    local L = Instance.new("UIListLayout", Container); L.Padding = UDim.new(0, 5)
+    Instance.new("UIListLayout", Container).Padding = UDim.new(0, 5)
 
-    local expanded = false
+    local open = false
     Btn.MouseButton1Click:Connect(function()
-        expanded = not expanded
-        local targetH = expanded and (45 + (35 * #Container:GetChildren())) or 40
-        TweenService:Create(Frame, TweenInfo.new(0.3), {Size = UDim2.new(1, -10, 0, targetH)}):Play()
-        Btn.Text = (expanded and "▲  " or "▼  ") .. text
+        open = not open
+        Frame:TweenSize(UDim2.new(1, -10, 0, open and (45 + (38 * #Container:GetChildren())) or 40), "Out", "Quart", 0.3, true)
+        Btn.Text = (open and "▲  " or "▼  ") .. text
     end)
     return Container
 end
 
 local function CreateToggle(parent, name, callback)
     local TBtn = Instance.new("TextButton", parent)
-    TBtn.Size = UDim2.new(1, -10, 0, 35); TBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50); TBtn.Text = name .. ": OFF"; TBtn.TextColor3 = Color3.new(1, 1, 1); TBtn.Font = Enum.Font.GothamBold
-    Instance.new("UICorner", TBtn).CornerRadius = UDim.new(0, 6)
+    TBtn.Size = UDim2.new(1, -10, 0, 35); TBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50); TBtn.Text = name .. ": TẮT"; TBtn.TextColor3 = Color3.new(1, 1, 1); TBtn.Font = Enum.Font.GothamBold
+    Instance.new("UICorner", TBtn)
 
-    local active = false
+    local act = false
     TBtn.MouseButton1Click:Connect(function()
-        active = not active
-        TBtn.BackgroundColor3 = active and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
-        TBtn.Text = name .. (active and ": ON" or ": OFF")
-        callback(active)
+        act = not act
+        TBtn.BackgroundColor3 = act and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
+        TBtn.Text = name .. (act and ": BẬT" or ": TẮT")
+        callback(act)
     end)
 end
 
--- =================== TRIỂN KHAI NỘI DUNG = ===================
+-- =================== CÀI ĐẶT NỘI DUNG ===================
 
-local MainSection = CreateDropdown(Content, "MAIN FUNCTIONS")
-CreateToggle(MainSection, "Aimbot Skill", function(s) Settings.AimbotEnabled = s end)
-CreateToggle(MainSection, "Auto Attack", function(s) Settings.AutoAttackEnabled = s end)
+local CombatTab = CreateDropdown("CHỨC NĂNG CHÍNH")
+CreateToggle(CombatTab, "Aimbot Kỹ Năng", function(s) Settings.AimbotEnabled = s end)
+CreateToggle(CombatTab, "Tự Động Đánh (Fast)", function(s) Settings.AutoAttackEnabled = s end)
 
-local TeleportSection = CreateDropdown(Content, "TELEPORT SEA 1")
-for name, cf in pairs(Sea1Locations) do
-    CreateToggle(TeleportSection, name, function(s) 
-        if s then TweenTeleport(cf * CFrame.new(0, 50, 0)) end 
-    end)
+for sea, islands in pairs(Locations) do
+    local SeaTab = CreateDropdown("DỊCH CHUYỂN " .. sea)
+    for name, cf in pairs(islands) do
+        CreateToggle(SeaTab, name, function(s) if s then TweenTP(cf) end end)
+    end
 end
 
--- =================== VẬN HÀNH = ===================
+-- =================== LOGIC VẬN HÀNH ===================
 
-local MenuVis = false
-AvatarBtn.MouseButton1Click:Connect(function()
-    MenuVis = not MenuVis
-    MainFrame.Visible = true
-    local targetS = MenuVis and UDim2.new(0, 550, 0, 350) or UDim2.new(0, 550, 0, 0)
-    MainFrame:TweenSize(targetS, "Out", "Back", 0.3, true, function() if not MenuVis then MainFrame.Visible = false end end)
-    TweenService:Create(AvatarBtn, TweenInfo.new(0.3), {ImageTransparency = MenuVis and 0.5 or 0}):Play()
-end)
-
-RunService.Heartbeat:Connect(function()
+-- Fix Auto Attack (Đánh Nhanh & Đánh Xa)
+RunService.Stepped:Connect(function()
     if Settings.AutoAttackEnabled then
         pcall(function()
-            local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool") or LocalPlayer.Backpack:FindFirstChildOfClass("Tool")
-            if tool and not LocalPlayer.Character:FindFirstChild(tool.Name) then LocalPlayer.Character.Humanoid:EquipTool(tool) end
+            local char = LocalPlayer.Character
+            local tool = char:FindFirstChildOfClass("Tool") or LocalPlayer.Backpack:FindFirstChildOfClass("Tool")
+            if tool and not char:FindFirstChild(tool.Name) then char.Humanoid:EquipTool(tool) end
+            
+            -- Sửa lỗi đánh xa: Tăng kích thước Handle vũ khí tạm thời
+            if tool and tool:FindFirstChild("Handle") then
+                tool.Handle.Size = Vector3.new(Settings.AttackRange, Settings.AttackRange, Settings.AttackRange)
+                tool.Handle.CanCollide = false
+            end
+            
             VirtualUser:Button1Down(Vector2.new(1,1))
+            if Settings.FastAttack then task.wait() VirtualUser:Button1Up(Vector2.new(1,1)) end
         end)
     end
 end)
 
--- Kéo thả AvatarBtn
-local d, ds, sp
-AvatarBtn.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then d = true; ds = i.Position; sp = AvatarBtn.Position end end)
-UserInputService.InputChanged:Connect(function(i) if d and i.UserInputType == Enum.UserInputType.MouseMovement then local delta = i.Position - ds; AvatarBtn.Position = UDim2.new(sp.X.Scale, sp.X.Offset + delta.X, sp.Y.Scale, sp.Y.Offset + delta.Y) end end)
-UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then d = false end end)
+-- Fix Aimbot Dự Đoán
+RunService.RenderStepped:Connect(function()
+    if Settings.AimbotEnabled and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+        local target = nil; local dist = Settings.MaxDistance
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                local pos, vis = Camera:WorldToScreenPoint(p.Character.HumanoidRootPart.Position)
+                if vis then
+                    local mag = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(pos.X, pos.Y)).Magnitude
+                    if mag < dist then dist = mag; target = p end
+                end
+            end
+        end
+        if target then
+            local predictedPos = target.Character.HumanoidRootPart.Position + (target.Character.HumanoidRootPart.Velocity * Settings.Prediction)
+            local sPos = Camera:WorldToScreenPoint(predictedPos)
+            if getgenv().movemouse then getgenv().movemouse(sPos.X, sPos.Y) end
+        end
+    end
+end)
 
-print("TRIET HUB DROPDOWN LOADED!")
+-- Mở/Đóng Menu
+AvatarBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = true
+    local open = MainFrame.Size.Y.Offset == 0
+    MainFrame:TweenSize(UDim2.new(0, 550, 0, open and 350 or 0), "Out", "Back", 0.3, true, function() if not open then MainFrame.Visible = false end end)
+end)
+
+print("TRIET HUB ĐÃ SẴN SÀNG!")
