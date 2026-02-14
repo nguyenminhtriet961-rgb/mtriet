@@ -1,12 +1,13 @@
--- Roblox Client Utility Tool - Gun Game Debug & Training
--- Sử dụng Rayfield UI Library
+-- Roblox Mobile Client Utility Tool - Gun Game Debug & Training
+-- Tối ưu cho màn hình cảm ứng Mobile
 -- Tạo bởi: AI Assistant
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
-local HttpService = game:GetService("HttpService")
+local GuiService = game:GetService("GuiService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 
 -- LocalPlayer
 local LocalPlayer = Players.LocalPlayer
@@ -18,26 +19,117 @@ local LocalRootPart = LocalCharacter:WaitForChild("HumanoidRootPart")
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 -- Variables
-local CameraLockEnabled = false
+local MenuOpen = false
+local ESPEnabled = false
+local HitboxExpanderEnabled = false
+local AimbotEnabled = false
 local TargetPlayer = nil
-local InfiniteJumpEnabled = false
 local ESPHighlights = {}
-local HitboxParts = {}
+local ESPColor = Color3.new(1, 0, 0)
+local FOVRadius = 200 -- Kích thước vòng tròn FOV
+
+-- Tạo nút kéo thả cho Mobile
+local function CreateMobileButton()
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "MobileMenuButton"
+    ScreenGui.Parent = game:GetService("CoreGui")
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    local MenuButton = Instance.new("ImageButton")
+    MenuButton.Name = "MenuButton"
+    MenuButton.Size = UDim2.new(0, 60, 0, 60)
+    MenuButton.Position = UDim2.new(0, 50, 0, 100)
+    MenuButton.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+    MenuButton.BorderSizePixel = 2
+    MenuButton.BorderColor3 = Color3.new(1, 1, 1)
+    MenuButton.Image = "rbxasset://textures/ui/InspectMenu/focus.png"
+    MenuButton.Parent = ScreenGui
+    
+    local UICorner = Instance.new("UICorner")
+    UICorner.CornerRadius = UDim.new(0, 30)
+    UICorner.Parent = MenuButton
+    
+    local dragging = false
+    local dragStart = nil
+    local startPos = nil
+    
+    MenuButton.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = MenuButton.Position
+        elseif input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            MenuOpen = not MenuOpen
+            if MenuOpen then
+                Rayfield:ShowWindow()
+                MenuButton.ImageColor3 = Color3.new(0, 1, 0)
+            else
+                Rayfield:HideWindow()
+                MenuButton.ImageColor3 = Color3.new(1, 1, 1)
+            end
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+            local delta = input.Position - dragStart
+            MenuButton.Position = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    
+    return ScreenGui
+end
+
+-- Tạo FOV Circle
+local function CreateFOVCircle()
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "FOVCircle"
+    ScreenGui.Parent = game:GetService("CoreGui")
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    local FOVFrame = Instance.new("Frame")
+    FOVFrame.Name = "FOVFrame"
+    FOVFrame.Size = UDim2.new(0, FOVRadius * 2, 0, FOVRadius * 2)
+    FOVFrame.Position = UDim2.new(0.5, -FOVRadius, 0.5, -FOVRadius)
+    FOVFrame.BackgroundTransparency = 1
+    FOVFrame.Parent = ScreenGui
+    
+    local UICorner = Instance.new("UICorner")
+    UICorner.CornerRadius = UDim.new(0.5, 0)
+    UICorner.Parent = FOVFrame
+    
+    local UIStroke = Instance.new("UIStroke")
+    UIStroke.Thickness = 2
+    UIStroke.Color = Color3.new(1, 0, 0)
+    UIStroke.Transparency = 0.5
+    UIStroke.Parent = FOVFrame
+    
+    return ScreenGui, FOVFrame
+end
 
 -- Tạo Window chính
 local Window = Rayfield:CreateWindow({
-    Name = "🎯 Client Utility Tool - Gun Game Debug",
-    LoadingTitle = "Đang tải bộ công cụ...",
-    LoadingSubtitle = "Chờ xíu nhé...",
+    Name = "📱 Mobile Utility Tool",
+    LoadingTitle = "Đang tải...",
+    LoadingSubtitle = "Mobile Version",
     ConfigurationSaving = {
         Enabled = true,
-        FolderName = "ClientUtilityTool",
+        FolderName = "MobileUtilityTool",
         FileName = "Config"
     },
     Discord = {
-        Enabled = false,
-        Invite = "noinvitelink",
-        RememberJoins = true
+        Enabled = false
     },
     KeySystem = false,
 })
@@ -47,9 +139,6 @@ local VisualsTab = Window:CreateTab("👁️ Visuals", 4483362458)
 
 -- Player ESP Section
 local ESPSection = VisualsTab:CreateSection("🎯 Player ESP")
-
-local ESPEnabled = false
-local ESPColor = Color3.new(1, 0, 0) -- Màu đỏ
 
 VisualsTab:CreateToggle({
     Name = "Bật Player ESP",
@@ -75,105 +164,45 @@ VisualsTab:CreateColorPicker({
     end,
 })
 
--- Hitbox Visualizer Section
-local HitboxSection = VisualsTab:CreateSection("📦 Hitbox Visualizer")
-
-local HitboxEnabled = false
+-- Hitbox Expander Section
+local HitboxSection = VisualsTab:CreateSection("📦 Hitbox Expander")
 
 VisualsTab:CreateToggle({
-    Name = "Bật Hitbox Visualizer",
+    Name = "Bật Hitbox Expander",
     CurrentValue = false,
-    Flag = "Hitbox_Enabled",
+    Flag = "Hitbox_Expander",
     Callback = function(Value)
-        HitboxEnabled = Value
-        if Value then
-            CreateHitboxes()
-        else
-            RemoveHitboxes()
-        end
+        HitboxExpanderEnabled = Value
     end,
 })
 
-VisualsTab:CreateSlider({
-    Name = "Kích thước Hitbox",
-    Range = {10, 30},
-    Increment = 1,
-    CurrentValue = 20,
-    Flag = "Hitbox_Size",
-    Callback = function(Value)
-        UpdateHitboxSize(Value)
-    end,
-})
+-- Tab Combat
+local CombatTab = Window:CreateTab("⚔️ Combat", 4483362458)
 
--- Tab Assist
-local AssistTab = Window:CreateTab("🎮 Assist", 4483362458)
+-- Aimbot Section
+local AimbotSection = CombatTab:CreateSection("🎯 Aimbot")
 
--- Camera Lock Section
-local CameraSection = AssistTab:CreateSection("📷 Camera Lock")
-
-VisualsTab:CreateToggle({
-    Name = "Camera Lock (Nhấn Q)",
+CombatTab:CreateToggle({
+    Name = "Bật Aimbot (FOV Auto Lock)",
     CurrentValue = false,
-    Flag = "Camera_Lock",
+    Flag = "Aimbot_Enabled",
     Callback = function(Value)
-        CameraLockEnabled = Value
+        AimbotEnabled = Value
         if not Value then
             TargetPlayer = nil
         end
     end,
 })
 
-AssistTab:CreateKeybind({
-    Name = "Phím Camera Lock",
-    CurrentKeybind = "Q",
-    HoldToInteract = false,
-    Flag = "Camera_Lock_Key",
-    Callback = function(Keybind)
-        -- Keybind đã được thiết lập
-    end,
-})
-
--- Tab LocalPlayer
-local PlayerTab = Window:CreateTab("👤 LocalPlayer", 4483362458)
-
--- Movement Section
-local MovementSection = PlayerTab:CreateSection("🏃 Movement")
-
-PlayerTab:CreateSlider({
-    Name = "Walk Speed",
-    Range = {16, 100},
-    Increment = 1,
-    CurrentValue = 16,
-    Flag = "Walk_Speed",
+CombatTab:CreateSlider({
+    Name = "FOV Radius",
+    Range = {100, 400},
+    Increment = 10,
+    CurrentValue = 200,
+    Flag = "FOV_Radius",
     Callback = function(Value)
-        if LocalHumanoid then
-            LocalHumanoid.WalkSpeed = Value
-        end
-    end,
-})
-
-PlayerTab:CreateSlider({
-    Name = "Jump Power",
-    Range = {0, 100},
-    Increment = 1,
-    CurrentValue = 50,
-    Flag = "Jump_Power",
-    Callback = function(Value)
-        if LocalHumanoid then
-            LocalHumanoid.JumpPower = Value
-        end
-    end,
-})
-
--- Jump Section
-local JumpSection = PlayerTab:CreateSection("🦘 Jump")
-
-PlayerTab:CreateToggle({
-    Name = "Vô hạn nhảy",
-    CurrentValue = false,
-    Flag = "Infinite_Jump",
-    Callback = function(Value)
-        InfiniteJumpEnabled = Value
+        FOVRadius = Value
+        UpdateFOVSize()
     end,
 })
 
@@ -197,53 +226,13 @@ function CreatePlayerESP(Player)
     Highlight.Name = "ESP_Highlight_" .. Player.Name
     Highlight.FillColor = ESPColor
     Highlight.OutlineColor = ESPColor
-    Highlight.FillTransparency = 0.3
-    Highlight.OutlineTransparency = 0
-    Highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop -- Luôn hiển thị trên cùng
+    Highlight.FillTransparency = 0.5
+    Highlight.OutlineTransparency = 0.2
+    Highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     Highlight.Parent = Character
     
-    -- Tạo BillboardGui cho tên và khoảng cách
-    local BillboardGui = Instance.new("BillboardGui")
-    BillboardGui.Name = "ESP_Billboard_" .. Player.Name
-    BillboardGui.Size = UDim2.new(0, 100, 0, 50)
-    BillboardGui.StudsOffset = Vector3.new(0, 3, 0)
-    BillboardGui.AlwaysOnTop = true
-    BillboardGui.Parent = Character
-    
-    local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(1, 0, 1, 0)
-    Frame.BackgroundTransparency = 1
-    Frame.Parent = BillboardGui
-    
-    local NameLabel = Instance.new("TextLabel")
-    NameLabel.Name = "NameLabel"
-    NameLabel.Size = UDim2.new(1, 0, 0.5, 0)
-    NameLabel.Position = UDim2.new(0, 0, 0, 0)
-    NameLabel.BackgroundTransparency = 1
-    NameLabel.Text = Player.Name
-    NameLabel.TextColor3 = ESPColor
-    NameLabel.TextStrokeTransparency = 0
-    NameLabel.TextScaled = true
-    NameLabel.Font = Enum.Font.SourceSansBold
-    NameLabel.Parent = Frame
-    
-    local DistanceLabel = Instance.new("TextLabel")
-    DistanceLabel.Name = "DistanceLabel"
-    DistanceLabel.Size = UDim2.new(1, 0, 0.5, 0)
-    DistanceLabel.Position = UDim2.new(0, 0, 0.5, 0)
-    DistanceLabel.BackgroundTransparency = 1
-    DistanceLabel.Text = "0m"
-    DistanceLabel.TextColor3 = ESPColor
-    DistanceLabel.TextStrokeTransparency = 0
-    DistanceLabel.TextScaled = true
-    DistanceLabel.Font = Enum.Font.SourceSans
-    DistanceLabel.Parent = Frame
-    
     ESPHighlights[Player] = {
-        Highlight = Highlight,
-        BillboardGui = BillboardGui,
-        NameLabel = NameLabel,
-        DistanceLabel = DistanceLabel
+        Highlight = Highlight
     }
 end
 
@@ -251,9 +240,6 @@ function RemoveESP()
     for Player, ESPData in pairs(ESPHighlights) do
         if ESPData.Highlight then
             ESPData.Highlight:Destroy()
-        end
-        if ESPData.BillboardGui then
-            ESPData.BillboardGui:Destroy()
         end
     end
     ESPHighlights = {}
@@ -265,85 +251,56 @@ function UpdateESPColors()
             ESPData.Highlight.FillColor = ESPColor
             ESPData.Highlight.OutlineColor = ESPColor
         end
-        if ESPData.NameLabel then
-            ESPData.NameLabel.TextColor3 = ESPColor
-        end
-        if ESPData.DistanceLabel then
-            ESPData.DistanceLabel.TextColor3 = ESPColor
-        end
     end
 end
 
--- Tạo Hitbox Visualizer
-function CreateHitboxes()
+-- Hitbox Expander - Ép kích thước Head và HumanoidRootPart
+function ExpandHitboxes()
     for _, Player in pairs(Players:GetPlayers()) do
         if Player ~= LocalPlayer and Player.Character then
-            CreatePlayerHitbox(Player)
+            local Character = Player.Character
+            local Head = Character:FindFirstChild("Head")
+            local RootPart = Character:FindFirstChild("HumanoidRootPart")
+            
+            if Head then
+                Head.Size = Vector3.new(20, 20, 20)
+                Head.Transparency = 0.5
+                Head.BrickColor = BrickColor.new("Really red")
+                Head.CanCollide = false
+                Head.Material = Enum.Material.ForceField
+            end
+            
+            if RootPart then
+                RootPart.Size = Vector3.new(20, 20, 20)
+                RootPart.Transparency = 0.5
+                RootPart.BrickColor = BrickColor.new("Really red")
+                RootPart.CanCollide = false
+                RootPart.Material = Enum.Material.ForceField
+            end
         end
     end
 end
 
-function CreatePlayerHitbox(Player)
-    local Character = Player.Character
-    if not Character then return end
-    
-    local RootPart = Character:FindFirstChild("HumanoidRootPart")
-    if not RootPart then return end
-    
-    -- Tạo Part cho hitbox
-    local HitboxPart = Instance.new("Part")
-    HitboxPart.Name = "Hitbox_" .. Player.Name
-    HitboxPart.Size = Vector3.new(20, 20, 20) -- Kích thước lớn như yêu cầu
-    HitboxPart.Material = Enum.Material.ForceField
-    HitboxPart.BrickColor = BrickColor.new("Really red")
-    HitboxPart.Transparency = 0.7
-    HitboxPart.CanCollide = false -- Quan trọng: không va chạm với tường
-    HitboxPart.Anchored = false
-    HitboxPart.Massless = true
-    
-    -- Weld để gắn vào HumanoidRootPart
-    local Weld = Instance.new("Weld")
-    Weld.Part0 = RootPart
-    Weld.Part1 = HitboxPart
-    Weld.C0 = CFrame.new(0, 0, 0)
-    Weld.Parent = HitboxPart
-    
-    HitboxPart.Parent = Character
-    
-    HitboxParts[Player] = HitboxPart
-end
-
-function RemoveHitboxes()
-    for Player, HitboxPart in pairs(HitboxParts) do
-        if HitboxPart then
-            HitboxPart:Destroy()
-        end
-    end
-    HitboxParts = {}
-end
-
-function UpdateHitboxSize(Size)
-    for Player, HitboxPart in pairs(HitboxParts) do
-        if HitboxPart then
-            HitboxPart.Size = Vector3.new(Size, Size, Size)
-        end
-    end
-end
-
--- Camera Lock
-function GetNearestPlayer()
+-- Aimbot với FOV
+function GetNearestPlayerInFOV()
     local NearestPlayer = nil
     local NearestDistance = math.huge
+    local Camera = workspace.CurrentCamera
     
     for _, Player in pairs(Players:GetPlayers()) do
         if Player ~= LocalPlayer and Player.Character then
             local Character = Player.Character
             local Head = Character:FindFirstChild("Head")
             if Head then
-                local Distance = (LocalRootPart.Position - Head.Position).Magnitude
-                if Distance < NearestDistance then
-                    NearestDistance = Distance
-                    NearestPlayer = Player
+                local Vector, OnScreen = Camera:WorldToScreenPoint(Head.Position)
+                if OnScreen then
+                    local MousePosition = UserInputService:GetMouseLocation()
+                    local Distance = (Vector2.new(Vector.X, Vector.Y) - MousePosition).Magnitude
+                    
+                    if Distance <= FOVRadius and Distance < NearestDistance then
+                        NearestDistance = Distance
+                        NearestPlayer = Player
+                    end
                 end
             end
         end
@@ -352,49 +309,38 @@ function GetNearestPlayer()
     return NearestPlayer
 end
 
-function CameraLock()
-    if CameraLockEnabled and TargetPlayer and TargetPlayer.Character then
-        local Head = TargetPlayer.Character:FindFirstChild("Head")
-        if Head then
-            workspace.CurrentCamera.CFrame = CFrame.new(workspace.CurrentCamera.CFrame.Position, Head.Position)
+function Aimbot()
+    if AimbotEnabled then
+        TargetPlayer = GetNearestPlayerInFOV()
+        if TargetPlayer and TargetPlayer.Character then
+            local Head = TargetPlayer.Character:FindFirstChild("Head")
+            if Head then
+                workspace.CurrentCamera.CFrame = CFrame.new(workspace.CurrentCamera.CFrame.Position, Head.Position)
+            end
         end
     end
 end
 
--- Input handling
-UserInputService.InputBegan:Connect(function(Input, GameProcessed)
-    if GameProcessed then return end
-    
-    -- Camera Lock với phím Q
-    if Input.KeyCode == Enum.KeyCode.Q then
-        if CameraLockEnabled then
-            TargetPlayer = GetNearestPlayer()
+function UpdateFOVSize()
+    local FOVGui = game:GetService("CoreGui"):FindFirstChild("FOVCircle")
+    if FOVGui then
+        local FOVFrame = FOVGui:FindFirstChild("FOVFrame")
+        if FOVFrame then
+            FOVFrame.Size = UDim2.new(0, FOVRadius * 2, 0, FOVRadius * 2)
+            FOVFrame.Position = UDim2.new(0.5, -FOVRadius, 0.5, -FOVRadius)
         end
     end
-    
-    -- Infinite Jump
-    if Input.KeyCode == Enum.KeyCode.Space and InfiniteJumpEnabled then
-        if LocalHumanoid then
-            LocalHumanoid.Jump = true
-        end
-    end
-end)
+end
 
--- RenderStepped loop
+-- RenderStepped loop - Tối ưu cho Mobile
 RunService.RenderStepped:Connect(function()
-    -- Cập nhật khoảng cách ESP
-    for Player, ESPData in pairs(ESPHighlights) do
-        if Player.Character and ESPData.DistanceLabel then
-            local RootPart = Player.Character:FindFirstChild("HumanoidRootPart")
-            if RootPart then
-                local Distance = math.floor((LocalRootPart.Position - RootPart.Position).Magnitude)
-                ESPData.DistanceLabel.Text = tostring(Distance) .. "m"
-            end
-        end
+    -- Hitbox Expander - Luôn ép kích thước
+    if HitboxExpanderEnabled then
+        ExpandHitboxes()
     end
     
-    -- Camera Lock
-    CameraLock()
+    -- Aimbot
+    Aimbot()
 end)
 
 -- Player events
@@ -402,11 +348,6 @@ Players.PlayerAdded:Connect(function(Player)
     if ESPEnabled then
         Player.CharacterAdded:Connect(function()
             CreatePlayerESP(Player)
-        end)
-    end
-    if HitboxEnabled then
-        Player.CharacterAdded:Connect(function()
-            CreatePlayerHitbox(Player)
         end)
     end
 end)
@@ -417,16 +358,7 @@ Players.PlayerRemoving:Connect(function(Player)
         if ESPHighlights[Player].Highlight then
             ESPHighlights[Player].Highlight:Destroy()
         end
-        if ESPHighlights[Player].BillboardGui then
-            ESPHighlights[Player].BillboardGui:Destroy()
-        end
         ESPHighlights[Player] = nil
-    end
-    
-    -- Dọn dẹp Hitbox
-    if HitboxParts[Player] then
-        HitboxParts[Player]:Destroy()
-        HitboxParts[Player] = nil
     end
     
     -- Xóa target nếu là người chơi đã thoát
@@ -442,6 +374,10 @@ LocalPlayer.CharacterAdded:Connect(function(Character)
     LocalRootPart = Character:WaitForChild("HumanoidRootPart")
 end)
 
+-- Initialize
+CreateMobileButton()
+CreateFOVCircle()
+
 -- Initialize cho người chơi hiện có
 for _, Player in pairs(Players:GetPlayers()) do
     if Player ~= LocalPlayer then
@@ -449,25 +385,24 @@ for _, Player in pairs(Players:GetPlayers()) do
             if ESPEnabled then
                 CreatePlayerESP(Player)
             end
-            if HitboxEnabled then
-                CreatePlayerHitbox(Player)
-            end
         end)
     end
 end
 
+-- Ẩn window ban đầu
+Rayfield:HideWindow()
+
 -- Thông báo
 Rayfield:Notify({
-    Title = "✅ Client Utility Tool",
-    Content = "Đã tải xong bộ công cụ! Sử dụng các tab để điều chỉnh tính năng.",
-    Duration = 5,
+    Title = "📱 Mobile Tool Ready",
+    Content = "Nhấn nút tròn để mở menu!",
+    Duration = 3,
     Image = 4483362458,
 })
 
-print("🎯 Client Utility Tool đã được tải thành công!")
-print("📝 Các tính năng:")
-print("- Player ESP với Highlight và BillboardGui")
-print("- Hitbox Visualizer với kích thước lớn")
-print("- Camera Lock (nhấn Q)")
-print("- Walk Speed và Jump Power điều chỉnh")
-print("- Infinite Jump")
+print("📱 Mobile Client Utility Tool đã được tải!")
+print("🎯 Tính năng:")
+print("- Nút kéo thả để mở/đóng menu")
+print("- Player ESP tối ưu")
+print("- Hitbox Expander (20x20x20)")
+print("- FOV Aimbot Auto Lock")
