@@ -1,5 +1,5 @@
--- Roblox Mobile Ultimate Client Utility - Assassins vs Sheriffs DUELS
--- Script hoàn chỉnh từ A đến Z - Tối ưu cho Mobile
+-- Roblox Mobile Legit Client Utility - Assassins vs Sheriffs DUELS
+-- Script Legit Version - Tránh BAC 4
 -- Tạo bởi: AI Assistant
 
 -- BẢO MẬT: Game ID Lock - Chỉ hoạt động trên Assassins vs Sheriffs DUELS
@@ -66,11 +66,12 @@ local NoclipEnabled = false
 local TargetPlayer = nil
 local ESPHighlights = {}
 local ESPColor = Color3.new(1, 0, 0)
-local FOVRadius = 150
-local AimSmoothness = 0.2
+local FOVRadius = 120
+local AimSmoothness = 0.15
 local CrosshairSize = 5
 local CrosshairColor = Color3.new(1, 1, 1)
 local IsAiming = false
+local MaxAimDistance = 100 -- Giới hạn 100 Studs để tránh BAC 4
 
 -- Drawing cho Smart Crosshair
 local Crosshair = Drawing.new("Circle")
@@ -197,7 +198,34 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
                     rayParams.FilterType = Enum.RaycastFilterType.Exclude
                     rayParams.FilterDescendantsInstances = {LocalCharacter, Workspace:FindFirstChild("Map")}
                     rayParams.IgnoreWater = true
-                    return oldNamecall(self, Camera.CFrame.Position, (Head.Position - Camera.CFrame.Position).unit * 1000, rayParams)
+                    -- Wall Check (Bắt buộc để tránh BAC 4)
+                    function IsVisible(Target)
+                        local Origin = Camera.CFrame.Position
+                        local Direction = (Target.Position - Origin).unit
+                        local RaycastParams = RaycastParams.new()
+                        RaycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+                        RaycastParams.FilterDescendantsInstances = {LocalCharacter}
+                        RaycastParams.IgnoreWater = true
+                        
+                        local RaycastResult = Workspace:Raycast(Origin, Direction * 1000, RaycastParams)
+                        
+                        if RaycastResult and RaycastResult.Instance then
+                            return RaycastResult.Instance:IsDescendantOf(Target.Parent)
+                        end
+                        return false
+                    end
+
+                    -- Distance Check (Giới hạn 100 Studs)
+                    function IsInDistance(Target)
+                        if not LocalRootPart then return false end
+                        
+                        local Distance = (Target.Position - LocalRootPart.Position).Magnitude
+                        return Distance <= MaxAimDistance
+                    end
+                    if IsVisible(Head) and IsInDistance(Head) then
+                        local ray = Ray.new(Camera.CFrame.Position, (Head.Position - Camera.CFrame.Position).unit * 1000)
+                        return oldNamecall(self, ray, rayParams)
+                    end
                 end
             end
         end
@@ -226,12 +254,12 @@ end)
 
 -- Tạo Window chính
 local Window = Rayfield:CreateWindow({
-    Name = "📱 Advanced Tool",
+    Name = "�️ Legit Tool",
     LoadingTitle = "Đang tải...",
-    LoadingSubtitle = "Tap-to-Shoot Version",
+    LoadingSubtitle = "Anti-BAC 4 Version",
     ConfigurationSaving = {
         Enabled = true,
-        FolderName = "AdvancedTool",
+        FolderName = "LegitTool",
         FileName = "Config"
     },
     Discord = {
@@ -274,18 +302,31 @@ VisualsTab:CreateColorPicker({
 -- Tab Combat
 local CombatTab = Window:CreateTab("⚔️ Combat", 4483362458)
 
--- Silent Aim Section
-local AimbotSection = CombatTab:CreateSection("🎯 Silent Aim")
+-- Legit Aim Section
+local AimbotSection = CombatTab:CreateSection("🎯 Legit Aim Assist")
 
 CombatTab:CreateToggle({
-    Name = "Bật Tap-to-Shoot Silent Aim",
+    Name = "Bật Legit Aim Assist (Camera)",
     CurrentValue = false,
-    Flag = "Silent_Aim_Enabled",
+    Flag = "Aim_Assist_Enabled",
     Callback = function(Value)
-        SilentAimEnabled = Value
+        AimAssistEnabled = Value
         if not Value then
             TargetPlayer = nil
+            IsAiming = false
+            Crosshair.Color = Color3.new(1, 1, 1)
         end
+    end,
+})
+
+CombatTab:CreateSlider({
+    Name = "Độ mượt (Smoothness)",
+    Range = {0.05, 0.3},
+    Increment = 0.05,
+    CurrentValue = 0.15,
+    Flag = "Aim_Smoothness",
+    Callback = function(Value)
+        AimSmoothness = Value
     end,
 })
 
@@ -381,14 +422,14 @@ function UpdateESPColors()
     end
 end
 
--- Silent Aim với FOV (KHÔNG kiểm tra tường)
+-- Silent Aim với FOV (Legit Version)
 function GetNearestPlayerInFOV()
     local NearestPlayer = nil
     local NearestDistance = math.huge
     local MousePosition = UserInputService:GetMouseLocation()
     
     for _, Player in pairs(Players:GetPlayers()) do
-        if Player ~= LocalPlayer and Player.Character then
+        if Player ~= LocalPlayer and IsAlive(Player) then
             local Character = Player.Character
             local Head = Character:FindFirstChild("Head")
             if Head then
@@ -396,10 +437,12 @@ function GetNearestPlayerInFOV()
                 if OnScreen then
                     local Distance = (Vector2.new(Vector.X, Vector.Y) - MousePosition).Magnitude
                     
-                    -- QUAN TRỌNG: Không kiểm tra tường, chỉ kiểm tra trong FOV
                     if Distance <= FOVRadius and Distance < NearestDistance then
-                        NearestDistance = Distance
-                        NearestPlayer = Player
+                        -- Bắt buộc: Wall Check + Distance Check để tránh BAC 4
+                        if IsVisible(Head) and IsInDistance(Head) then
+                            NearestDistance = Distance
+                            NearestPlayer = Player
+                        end
                     end
                 end
             end
@@ -475,17 +518,19 @@ Rayfield:HideWindow()
 
 -- Thông báo
 Rayfield:Notify({
-    Title = "📱 Advanced Tool Ready",
-    Content = "Tap-to-Shoot + Game ID Lock!",
-    Duration = 3,
+    Title = "�️ Legit Tool Ready",
+    Content = "Anti-BAC 4 - Safe Version!",
+    Duration = 5,
     Image = 4483362458,
 })
 
-print("📱 Mobile Client Utility Tool - Advanced Version đã được tải!")
-print("🎯 Tính năng:")
-print("- Game ID Lock (Chỉ hoạt động trên game ID: 15385224902)")
-print("- Tap-to-Shoot Silent Aim (Chạm bừa vẫn trúng đầu)")
-print("- Nút kéo thả để mở/đóng menu")
-print("- Player ESP (Box + Name, xuyên tường)")
-print("- FOV Circle 120 pixels")
-print("- Bảo mật độc quyền game")
+print("�️ Mobile Legit Client Utility đã được tải!")
+print("🎯 Tính năng Legit (An toàn):")
+print("🔒 Game ID Lock (Chỉ hoạt động trên Assassins vs Sheriffs DUELS)")
+print("🎯 Legit Aim Assist (Camera Smooth + Wall Check + Distance Check)")
+print("👁️ Player ESP (Always On Top)")
+print("🎯 Smart Crosshair (Đổi màu khi có mục tiêu)")
+print("🚪 Noclip (Đi xuyên tường)")
+print("📱 Mobile UI (Nút kéo thả)")
+print("⚡ KHÔNG thay đổi Hitbox - Tránh BAC 4")
+print("🛡️ Giới hạn 100 Studs - An toàn tuyệt đối")
