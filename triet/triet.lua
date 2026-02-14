@@ -1,9 +1,9 @@
--- Roblox Mobile Zephyr-Style Utility - Assassins vs Sheriffs DUELS
--- Fluent UI Version - Đẹp & Bypass
+-- Roblox Mobile Native GUI Utility - Assassins vs Sheriffs DUELS
+-- Native GUI Version - Không cần loadstring
 -- Tạo bởi: AI Assistant
 
 -- BẢO MẬT: Game ID Lock - Chỉ hoạt động trên 2 ID game
-local ValidGameIds = {15385224902, 12355337193} -- Game chính + Lobby
+local ValidGameIds = {15385224902, 12355337193}
 local IsValidGame = false
 
 for _, Id in pairs(ValidGameIds) do
@@ -11,47 +11,6 @@ for _, Id in pairs(ValidGameIds) do
         IsValidGame = true
         break
     end
-end
-
-if not IsValidGame then
-    -- Hiện thông báo lỗi rồi dừng hoạt động
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "ErrorMessage"
-    ScreenGui.Parent = game:GetService("CoreGui")
-    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    
-    local ErrorFrame = Instance.new("Frame")
-    ErrorFrame.Name = "ErrorFrame"
-    ErrorFrame.Size = UDim2.new(0, 350, 0, 180)
-    ErrorFrame.Position = UDim2.new(0.5, -175, 0.5, -90)
-    ErrorFrame.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
-    ErrorFrame.BorderSizePixel = 0
-    ErrorFrame.Parent = ScreenGui
-    
-    local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UDim.new(0, 15)
-    UICorner.Parent = ErrorFrame
-    
-    local UIStroke = Instance.new("UIStroke")
-    UIStroke.Thickness = 2
-    UIStroke.Color = Color3.new(1, 0.2, 0.2)
-    UIStroke.Transparency = 0.5
-    UIStroke.Parent = ErrorFrame
-    
-    local ErrorLabel = Instance.new("TextLabel")
-    ErrorLabel.Name = "ErrorLabel"
-    ErrorLabel.Size = UDim2.new(1, -20, 1, -20)
-    ErrorLabel.Position = UDim2.new(0, 10, 0, 10)
-    ErrorLabel.BackgroundTransparency = 1
-    ErrorLabel.Text = "❌ SAI GAME!\n\nScript chỉ hoạt động trên:\n• Assassins vs Sheriffs DUELS\n• Lobby/Waiting Room\n\nID hiện tại: " .. game.PlaceId .. "\nID hợp lệ: 15385224902 hoặc 12355337193"
-    ErrorLabel.TextColor3 = Color3.new(1, 1, 1)
-    ErrorLabel.TextScaled = true
-    ErrorLabel.Font = Enum.Font.GothamMedium
-    ErrorLabel.TextWrapped = true
-    ErrorLabel.Parent = ErrorFrame
-    
-    wait(5)
-    return
 end
 
 -- Services
@@ -62,7 +21,7 @@ local Workspace = game:GetService("Workspace")
 local Camera = workspace.CurrentCamera
 local TweenService = game:GetService("TweenService")
 local StarterGui = game:GetService("StarterGui")
-local VirtualInputManager = game:GetService("VirtualInputManager")
+local VirtualUser = game:GetService("VirtualUser")
 
 -- LocalPlayer
 local LocalPlayer = Players.LocalPlayer
@@ -70,23 +29,509 @@ local LocalCharacter = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait(
 local LocalHumanoid = LocalCharacter:WaitForChild("Humanoid")
 local LocalRootPart = LocalCharacter:WaitForChild("HumanoidRootPart")
 
--- Fluent UI Library (LinoriaLib)
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/ImJohnnyDev/linoria-lib/main/source.lua"))()
-
 -- Variables
 local MenuOpen = false
 local ESPEnabled = false
 local TriggerbotEnabled = false
-local FingerAimEnabled = false
-local SafeHitboxEnabled = false
-local HitboxSize = 4.0
+local AntiBlindEnabled = false
+local HitboxEnabled = false
+local HitboxSize = 4
 local TargetPlayer = nil
-local ESPBoxes = {}
-local ESPNames = {}
-local ESPColor = Color3.new(0, 0.5, 1) -- Xanh dương neon
-local FOVRadius = 100
-local AimSmoothness = 0.15
+local ESPHighlights = {}
+local ESPColor = Color3.fromRGB(255, 0, 0) -- Màu đỏ
 local IsAiming = false
+
+-- Tạo GUI Native (Không cần loadstring)
+local function CreateNativeGUI()
+    -- Main ScreenGui
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "NativeMenuGUI"
+    ScreenGui.Parent = game:GetService("CoreGui")
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    ScreenGui.ResetOnSpawn = false
+    
+    -- Nút Menu (Tròn nhỏ)
+    local MenuButton = Instance.new("ImageButton")
+    MenuButton.Name = "MenuButton"
+    MenuButton.Size = UDim2.new(0, 60, 0, 60)
+    MenuButton.Position = UDim2.new(0, 50, 0, 100)
+    MenuButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    MenuButton.BorderSizePixel = 0
+    MenuButton.Image = "rbxthumb://type=AvatarHeadShot&id=" .. LocalPlayer.UserId .. "&w=150&h=150"
+    MenuButton.Parent = ScreenGui
+    
+    local ButtonCorner = Instance.new("UICorner")
+    ButtonCorner.CornerRadius = UDim.new(0, 30)
+    ButtonCorner.Parent = MenuButton
+    
+    local ButtonStroke = Instance.new("UIStroke")
+    ButtonStroke.Thickness = 2
+    ButtonStroke.Color = Color3.fromRGB(0, 170, 255) -- Xanh dương neon
+    ButtonStroke.Transparency = 0.3
+    ButtonStroke.Parent = MenuButton
+    
+    -- Menu chính
+    local MenuFrame = Instance.new("Frame")
+    MenuFrame.Name = "MenuFrame"
+    MenuFrame.Size = UDim2.new(0, 300, 0, 400)
+    MenuFrame.Position = UDim2.new(0.5, -150, 0.5, -200)
+    MenuFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    MenuFrame.BorderSizePixel = 0
+    MenuFrame.Visible = false
+    MenuFrame.Parent = ScreenGui
+    
+    local MenuCorner = Instance.new("UICorner")
+    MenuCorner.CornerRadius = UDim.new(0, 15)
+    MenuCorner.Parent = MenuFrame
+    
+    local MenuStroke = Instance.new("UIStroke")
+    MenuStroke.Thickness = 2
+    MenuStroke.Color = Color3.fromRGB(0, 170, 255)
+    MenuStroke.Transparency = 0.5
+    MenuStroke.Parent = MenuFrame
+    
+    -- Tiêu đề
+    local TitleLabel = Instance.new("TextLabel")
+    TitleLabel.Name = "TitleLabel"
+    TitleLabel.Size = UDim2.new(1, 0, 0, 40)
+    TitleLabel.Position = UDim2.new(0, 0, 0, 0)
+    TitleLabel.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+    TitleLabel.BorderSizePixel = 0
+    TitleLabel.Text = "🎯 Zephyr Style Utility"
+    TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TitleLabel.TextScaled = true
+    TitleLabel.Font = Enum.Font.GothamMedium
+    TitleLabel.Parent = MenuFrame
+    
+    local TitleCorner = Instance.new("UICorner")
+    TitleCorner.CornerRadius = UDim.new(0, 15)
+    TitleCorner.Parent = TitleLabel
+    
+    -- Tab Buttons
+    local TabButtons = {}
+    local Tabs = {"Combat", "Visuals", "Settings"}
+    local TabWidth = 1 / #Tabs
+    
+    for i, TabName in pairs(Tabs) do
+        local TabButton = Instance.new("TextButton")
+        TabButton.Name = "TabButton_" .. TabName
+        TabButton.Size = UDim2.new(TabWidth, -2, 0, 30)
+        TabButton.Position = UDim2.new((i-1) * TabWidth, 1, 0, 45)
+        TabButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        TabButton.BorderSizePixel = 0
+        TabButton.Text = TabName
+        TabButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+        TabButton.TextScaled = true
+        TabButton.Font = Enum.Font.Gotham
+        TabButton.Parent = MenuFrame
+        
+        local TabCorner = Instance.new("UICorner")
+        TabCorner.CornerRadius = UDim.new(0, 5)
+        TabCorner.Parent = TabButton
+        
+        TabButtons[TabName] = TabButton
+    end
+    
+    -- Content Frame
+    local ContentFrame = Instance.new("Frame")
+    ContentFrame.Name = "ContentFrame"
+    ContentFrame.Size = UDim2.new(1, -20, 1, -100)
+    ContentFrame.Position = UDim2.new(0, 10, 0, 85)
+    ContentFrame.BackgroundTransparency = 1
+    ContentFrame.Parent = MenuFrame
+    
+    -- Combat Tab Content
+    local CombatContent = Instance.new("ScrollingFrame")
+    CombatContent.Name = "CombatContent"
+    CombatContent.Size = UDim2.new(1, 0, 1, 0)
+    CombatContent.Position = UDim2.new(0, 0, 0, 0)
+    CombatContent.BackgroundTransparency = 1
+    CombatContent.Visible = true
+    CombatContent.ScrollBarThickness = 5
+    CombatContent.Parent = ContentFrame
+    
+    local CombatLayout = Instance.new("UIListLayout")
+    CombatLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    CombatLayout.Padding = UDim.new(0, 10)
+    CombatLayout.Parent = CombatContent
+    
+    -- Triggerbot Toggle
+    local TriggerbotFrame = CreateToggle("Triggerbot (Auto Shoot)", false, function(Value)
+        TriggerbotEnabled = Value
+        ShowNotification("Triggerbot", Value and "Đã bật" or "Đã tắt")
+    end)
+    TriggerbotFrame.LayoutOrder = 1
+    TriggerbotFrame.Parent = CombatContent
+    
+    -- Visuals Tab Content
+    local VisualsContent = Instance.new("ScrollingFrame")
+    VisualsContent.Name = "VisualsContent"
+    VisualsContent.Size = UDim2.new(1, 0, 1, 0)
+    VisualsContent.Position = UDim2.new(0, 0, 0, 0)
+    VisualsContent.BackgroundTransparency = 1
+    VisualsContent.Visible = false
+    VisualsContent.ScrollBarThickness = 5
+    VisualsContent.Parent = ContentFrame
+    
+    local VisualsLayout = Instance.new("UIListLayout")
+    VisualsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    VisualsLayout.Padding = UDim.new(0, 10)
+    VisualsLayout.Parent = VisualsContent
+    
+    -- ESP Toggle
+    local ESPFrame = CreateToggle("ESP Highlight", false, function(Value)
+        ESPEnabled = Value
+        if Value then
+            CreateESP()
+        else
+            RemoveESP()
+        end
+        ShowNotification("ESP", Value and "Đã bật" or "Đã tắt")
+    end)
+    ESPFrame.LayoutOrder = 1
+    ESPFrame.Parent = VisualsContent
+    
+    -- Anti-Blind Toggle
+    local AntiBlindFrame = CreateToggle("Anti-Blind", false, function(Value)
+        AntiBlindEnabled = Value
+        ShowNotification("Anti-Blind", Value and "Đã bật" or "Đã tắt")
+    end)
+    AntiBlindFrame.LayoutOrder = 2
+    AntiBlindFrame.Parent = VisualsContent
+    
+    -- Settings Tab Content
+    local SettingsContent = Instance.new("ScrollingFrame")
+    SettingsContent.Name = "SettingsContent"
+    SettingsContent.Size = UDim2.new(1, 0, 1, 0)
+    SettingsContent.Position = UDim2.new(0, 0, 0, 0)
+    SettingsContent.BackgroundTransparency = 1
+    SettingsContent.Visible = false
+    SettingsContent.ScrollBarThickness = 5
+    SettingsContent.Parent = ContentFrame
+    
+    local SettingsLayout = Instance.new("UIListLayout")
+    SettingsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    SettingsLayout.Padding = UDim.new(0, 10)
+    SettingsLayout.Parent = SettingsContent
+    
+    -- Hitbox Toggle
+    local HitboxFrame = CreateToggle("Hitbox Expander (Safe)", false, function(Value)
+        HitboxEnabled = Value
+        UpdateHitbox()
+        ShowNotification("Hitbox", Value and "Đã bật" or "Đã tắt")
+    end)
+    HitboxFrame.LayoutOrder = 1
+    HitboxFrame.Parent = SettingsContent
+    
+    -- Tab switching logic
+    local function SwitchTab(TabName)
+        for _, Tab in pairs(Tabs) do
+            local Content = ContentFrame:FindFirstChild(TabName .. "Content")
+            if Content then
+                Content.Visible = (Tab == TabName)
+            end
+            
+            local Button = TabButtons[Tab]
+            if Button then
+                if Tab == TabName then
+                    Button.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+                    Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+                else
+                    Button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+                    Button.TextColor3 = Color3.fromRGB(200, 200, 200)
+                end
+            end
+        end
+    end
+    
+    -- Tab button events
+    for TabName, Button in pairs(TabButtons) do
+        Button.MouseButton1Click:Connect(function()
+            SwitchTab(TabName)
+        end)
+    end
+    
+    -- Menu button events
+    local dragging = false
+    local dragStart = nil
+    local startPos = nil
+    
+    MenuButton.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = MenuButton.Position
+        elseif input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            MenuOpen = not MenuOpen
+            MenuFrame.Visible = MenuOpen
+            ButtonStroke.Color = MenuOpen and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(0, 170, 255)
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+            local delta = input.Position - dragStart
+            MenuButton.Position = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    
+    -- Initialize first tab
+    SwitchTab("Combat")
+    
+    return ScreenGui
+end
+
+-- Tạo Toggle UI
+function CreateToggle(Text, Default, Callback)
+    local Frame = Instance.new("Frame")
+    Frame.Name = "Toggle_" .. Text
+    Frame.Size = UDim2.new(1, 0, 0, 40)
+    Frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    Frame.BorderSizePixel = 0
+    
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 8)
+    Corner.Parent = Frame
+    
+    local Label = Instance.new("TextLabel")
+    Label.Name = "Label"
+    Label.Size = UDim2.new(1, -60, 1, 0)
+    Label.Position = UDim2.new(0, 15, 0, 0)
+    Label.BackgroundTransparency = 1
+    Label.Text = Text
+    Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Label.TextScaled = true
+    Label.Font = Enum.Font.Gotham
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = Frame
+    
+    local ToggleButton = Instance.new("TextButton")
+    ToggleButton.Name = "ToggleButton"
+    ToggleButton.Size = UDim2.new(0, 40, 0, 20)
+    ToggleButton.Position = UDim2.new(1, -50, 0.5, -10)
+    ToggleButton.BackgroundColor3 = Default and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(100, 100, 100)
+    ToggleButton.BorderSizePixel = 0
+    ToggleButton.Text = ""
+    ToggleButton.Parent = Frame
+    
+    local ToggleCorner = Instance.new("UICorner")
+    ToggleCorner.CornerRadius = UDim.new(0, 10)
+    ToggleCorner.Parent = ToggleButton
+    
+    local State = Default
+    
+    ToggleButton.MouseButton1Click:Connect(function()
+        State = not State
+        ToggleButton.BackgroundColor3 = State and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(100, 100, 100)
+        if Callback then
+            Callback(State)
+        end
+    end)
+    
+    return Frame
+end
+
+-- Show Notification
+function ShowNotification(Title, Text)
+    local NotificationGui = Instance.new("ScreenGui")
+    NotificationGui.Name = "Notification_" .. tick()
+    NotificationGui.Parent = game:GetService("CoreGui")
+    NotificationGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    local NotificationFrame = Instance.new("Frame")
+    NotificationFrame.Name = "NotificationFrame"
+    NotificationFrame.Size = UDim2.new(0, 250, 0, 80)
+    NotificationFrame.Position = UDim2.new(1, -270, 1, -100)
+    NotificationFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    NotificationFrame.BorderSizePixel = 0
+    NotificationFrame.Parent = NotificationGui
+    
+    local NotifCorner = Instance.new("UICorner")
+    NotifCorner.CornerRadius = UDim.new(0, 10)
+    NotifCorner.Parent = NotificationFrame
+    
+    local NotifStroke = Instance.new("UIStroke")
+    NotifStroke.Thickness = 1
+    NotifStroke.Color = Color3.fromRGB(0, 170, 255)
+    NotifStroke.Transparency = 0.5
+    NotifStroke.Parent = NotificationFrame
+    
+    local TitleLabel = Instance.new("TextLabel")
+    TitleLabel.Name = "TitleLabel"
+    TitleLabel.Size = UDim2.new(1, -20, 0, 25)
+    TitleLabel.Position = UDim2.new(0, 10, 0, 5)
+    TitleLabel.BackgroundTransparency = 1
+    TitleLabel.Text = Title
+    TitleLabel.TextColor3 = Color3.fromRGB(0, 170, 255)
+    TitleLabel.TextScaled = true
+    TitleLabel.Font = Enum.Font.GothamMedium
+    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TitleLabel.Parent = NotificationFrame
+    
+    local TextLabel = Instance.new("TextLabel")
+    TextLabel.Name = "TextLabel"
+    TextLabel.Size = UDim2.new(1, -20, 0, 40)
+    TextLabel.Position = UDim2.new(0, 10, 0, 30)
+    TextLabel.BackgroundTransparency = 1
+    TextLabel.Text = Text
+    TextLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TextLabel.TextScaled = true
+    TextLabel.Font = Enum.Font.Gotham
+    TextLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TextLabel.TextWrapped = true
+    TextLabel.Parent = NotificationFrame
+    
+    -- Animation
+    local TweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local FadeIn = TweenService:Create(NotificationFrame, TweenInfo, {Position = UDim2.new(1, -270, 1, -100)})
+    FadeIn:Play()
+    
+    -- Auto remove
+    game:GetService("Debris"):AddItem(NotificationGui, 3)
+end
+
+-- Functions
+
+-- Kiểm tra người chơi còn sống
+function IsAlive(Player)
+    local Character = Player.Character
+    if not Character then return false end
+    
+    local Humanoid = Character:FindFirstChild("Humanoid")
+    if not Humanoid then return false end
+    
+    return Humanoid.Health > 0
+end
+
+-- Triggerbot Logic
+function Triggerbot()
+    if TriggerbotEnabled then
+        pcall(function()
+            local Mouse = LocalPlayer:GetMouse()
+            if Mouse.Target then
+                local Character = Mouse.Target.Parent
+                local Player = Players:GetPlayerFromCharacter(Character)
+                
+                if Player and Player ~= LocalPlayer and IsAlive(Player) then
+                    -- Tự động bắn
+                    VirtualUser:Button1Down(Vector2.new())
+                    wait(0.1)
+                    VirtualUser:Button1Up(Vector2.new())
+                end
+            end
+        end)
+    end
+end
+
+-- Tạo ESP Highlight
+function CreateESP()
+    for _, Player in pairs(Players:GetPlayers()) do
+        if Player ~= LocalPlayer and Player.Character then
+            CreatePlayerESP(Player)
+        end
+    end
+end
+
+function CreatePlayerESP(Player)
+    local Character = Player.Character
+    if not Character then return end
+    
+    local Highlight = Instance.new("Highlight")
+    Highlight.Name = "ESP_Highlight_" .. Player.Name
+    Highlight.FillColor = ESPColor
+    Highlight.OutlineColor = ESPColor
+    Highlight.FillTransparency = 0.5
+    Highlight.OutlineTransparency = 0.2
+    Highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    Highlight.Parent = Character
+    
+    ESPHighlights[Player] = Highlight
+end
+
+function RemoveESP()
+    for Player, Highlight in pairs(ESPHighlights) do
+        if Highlight then
+            Highlight:Destroy()
+        end
+    end
+    ESPHighlights = {}
+end
+
+-- Anti-Blind
+function AntiBlind()
+    if AntiBlindEnabled then
+        pcall(function()
+            for _, Player in pairs(Players:GetPlayers()) do
+                local PlayerGui = Player:FindFirstChild("PlayerGui")
+                if PlayerGui then
+                    for _, Child in pairs(PlayerGui:GetChildren()) do
+                        if Child.Name:lower():find("flashbang") or 
+                           Child.Name:lower():find("blind") or
+                           Child.Name:lower():find("white") or
+                           Child.Name:lower():find("screen") or
+                           Child.Name:lower():find("flash") then
+                            Child:Destroy()
+                        end
+                    end
+                end
+            end
+        end)
+    end
+end
+
+-- Hitbox Expander (Safe)
+function UpdateHitbox()
+    pcall(function()
+        if HitboxEnabled then
+            for _, Player in pairs(Players:GetPlayers()) do
+                if Player ~= LocalPlayer and IsAlive(Player) then
+                    local Character = Player.Character
+                    if Character then
+                        local Head = Character:FindFirstChild("Head")
+                        if Head then
+                            Head.Size = Vector3.new(HitboxSize, HitboxSize, HitboxSize)
+                            Head.Transparency = 0.7
+                        end
+                    end
+                end
+            end
+        else
+            -- Reset về mặc định
+            for _, Player in pairs(Players:GetPlayers()) do
+                if Player ~= LocalPlayer then
+                    local Character = Player.Character
+                    if Character then
+                        local Head = Character:FindFirstChild("Head")
+                        if Head then
+                            Head.Size = Vector3.new(2, 1, 1)
+                            Head.Transparency = 0
+                        end
+                    end
+                end
+            end
+        end
+    end)
+end
+
+-- Game ID Check (Warn only)
+function CheckGameID()
+    if not IsValidGame then
+        ShowNotification("⚠️ Warning", "Game không được hỗ trợ!")
+        return false
+    end
+    return true
+end
 
 -- Tạo nút kéo thả cho Mobile (Fluent Style)
 local function CreateMobileButton()
@@ -1033,30 +1478,40 @@ for _, Player in pairs(Players:GetPlayers()) do
         Player.CharacterAdded:Connect(function(Character)
             if ESPEnabled then
                 CreateESPBox(Player)
-                CreateESPName(Player)
             end
         end)
     end
+end
 
-    Players.PlayerRemoving:Connect(function(Player)
-        -- Dọn dẹp ESP
-        if ESPBoxes[Player] then
-            ESPBoxes[Player]:Destroy()
-            ESPBoxes[Player] = nil
-        end
-        
-        if ESPNames[Player] then
-            ESPNames[Player]:Destroy()
-            ESPNames[Player] = nil
-        end
-        
-        -- Xóa target nếu là người chơi đã thoát
-        if TargetPlayer == Player then
-            TargetPlayer = nil
-            IsAiming = false
+-- Initialize
+if CheckGameID() then
+    -- Tạo GUI
+    local MainGUI = CreateNativeGUI()
+    
+    -- RenderStepped loop
+    RunService.RenderStepped:Connect(function()
+        pcall(function()
+            Triggerbot()
+            AntiBlind()
+        end)
+    end)
+    
+    -- Player events
+    Players.PlayerAdded:Connect(function(Player)
+        if ESPEnabled then
+            Player.CharacterAdded:Connect(function()
+                CreatePlayerESP(Player)
+            end)
         end
     end)
-
+    
+    Players.PlayerRemoving:Connect(function(Player)
+        if ESPHighlights[Player] then
+            ESPHighlights[Player]:Destroy()
+            ESPHighlights[Player] = nil
+        end
+    end)
+    
     -- Character added events cho local player
     LocalPlayer.CharacterAdded:Connect(function(Character)
         LocalCharacter = Character
@@ -1064,47 +1519,34 @@ for _, Player in pairs(Players:GetPlayers()) do
         LocalRootPart = Character:WaitForChild("HumanoidRootPart")
         
         -- Cập nhật avatar trên nút menu
-        local MenuButton = game:GetService("CoreGui"):FindFirstChild("FluentMenuButton")
+        local MenuButton = MainGUI:FindFirstChild("MenuButton")
         if MenuButton then
-            local Button = MenuButton:FindFirstChild("MenuButton")
-            if Button then
-                Button.Image = "rbxthumb://type=AvatarHeadShot&id=" .. LocalPlayer.UserId .. "&w=150&h=150"
-            end
+            MenuButton.Image = "rbxthumb://type=AvatarHeadShot&id=" .. LocalPlayer.UserId .. "&w=150&h=150"
         end
     end)
-
-    -- Initialize
-    CreateMobileButton()
-
+    
     -- Initialize cho người chơi hiện có
     for _, Player in pairs(Players:GetPlayers()) do
         if Player ~= LocalPlayer then
             Player.CharacterAdded:Connect(function(Character)
                 if ESPEnabled then
-                    CreateESPBox(Player)
-                    CreateESPName(Player)
+                    CreatePlayerESP(Player)
                 end
             end)
         end
     end
-
-    -- Ẩn window ban đầu
-    Fluent:Hide()
-
+    
     -- Thông báo khởi động
-    Library:Notify({
-        Title = "Zephyr Style Ready",
-        Content = "Fluent UI - Đẹp & Bypass!",
-        Duration = 5
-    })
-
-    print("🌟 Zephyr Style Utility đã được tải!")
-    print("📋 Tính năng cao cấp:")
-    print("🎨 Fluent UI (LinoriaLib - Đẹp như Zephyr)")
-    print("🎯 Triggerbot (VIP) + Finger Aim")
-    print("👁️ ESP Box + Name + Anti-Blind")
-    print("👤 Safe Hitbox (Max 5.0) - Mặc định 4.0")
-    print("📱 Mobile UI (Nút kéo thả)")
-    print("� Game ID Lock (2 ID hợp lệ)")
-    print("🛡️ Bypass Anti-Cheat cơ bản")
-    print("⚡ Đẹp như Zephyr, An toàn tuyệt đối!")
+    ShowNotification(" Ready", "Zephyr Style đã tải!")
+    
+    print(" Zephyr Style Utility đã được tải!")
+    print(" Tính năng:")
+    print(" Native GUI (Không cần loadstring)")
+    print(" Triggerbot (Auto Shoot)")
+    print(" ESP Highlight (Màu đỏ)")
+    print(" Anti-Blind")
+    print(" Hitbox Expander (Size 4)")
+    print(" Mobile Friendly")
+    print(" Game ID Lock (2 ID)")
+    print(" Tối ưu cho Delta/Fluxus")
+end
