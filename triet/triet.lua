@@ -1,5 +1,5 @@
 -- Roblox Mobile Client Utility Tool - Gun Game Debug & Training
--- Tối ưu cho màn hình cảm ứng Mobile
+-- Tối ưu cho màn hình cảm ứng Mobile - Anti-Kick Version
 -- Tạo bởi: AI Assistant
 
 local Players = game:GetService("Players")
@@ -8,6 +8,7 @@ local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local GuiService = game:GetService("GuiService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
+local Camera = workspace.CurrentCamera
 
 -- LocalPlayer
 local LocalPlayer = Players.LocalPlayer
@@ -22,11 +23,12 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local MenuOpen = false
 local ESPEnabled = false
 local HitboxExpanderEnabled = false
-local AimbotEnabled = false
+local SilentAimEnabled = false
 local TargetPlayer = nil
 local ESPHighlights = {}
 local ESPColor = Color3.new(1, 0, 0)
-local FOVRadius = 200 -- Kích thước vòng tròn FOV
+local FOVRadius = 150 -- Kích thước vòng tròn FOV
+local OriginalHitboxSizes = {} -- Lưu kích thước gốc
 
 -- Tạo nút kéo thả cho Mobile
 local function CreateMobileButton()
@@ -118,6 +120,33 @@ local function CreateFOVCircle()
     return ScreenGui, FOVFrame
 end
 
+-- Hook cho Silent Aim
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+    
+    if SilentAimEnabled and method == "FindPartOnRayWithIgnoreList" or method == "Raycast" then
+        local Target = GetNearestPlayerInFOV()
+        if Target and Target.Character then
+            local RootPart = Target.Character:FindFirstChild("HumanoidRootPart")
+            if RootPart then
+                if method == "FindPartOnRayWithIgnoreList" then
+                    local ray = Ray.new(Camera.CFrame.Position, (RootPart.Position - Camera.CFrame.Position).unit * 1000)
+                    return oldNamecall(self, ray, args[2], args[3], args[4])
+                elseif method == "Raycast" then
+                    local rayParams = RaycastParams.new()
+                    rayParams.FilterDescendantsInstances = args[2] or {LocalCharacter}
+                    rayParams.IgnoreWater = true
+                    return oldNamecall(self, Camera.CFrame.Position, (RootPart.Position - Camera.CFrame.Position).unit * 1000, rayParams)
+                end
+            end
+        end
+    end
+    
+    return oldNamecall(self, ...)
+end)
+
 -- Tạo Window chính
 local Window = Rayfield:CreateWindow({
     Name = "📱 Mobile Utility Tool",
@@ -179,15 +208,15 @@ VisualsTab:CreateToggle({
 -- Tab Combat
 local CombatTab = Window:CreateTab("⚔️ Combat", 4483362458)
 
--- Aimbot Section
-local AimbotSection = CombatTab:CreateSection("🎯 Aimbot")
+-- Silent Aim Section
+local AimbotSection = CombatTab:CreateSection("🎯 Silent Aim")
 
 CombatTab:CreateToggle({
-    Name = "Bật Aimbot (FOV Auto Lock)",
+    Name = "Bật Silent Aim (FOV)",
     CurrentValue = false,
-    Flag = "Aimbot_Enabled",
+    Flag = "Silent_Aim_Enabled",
     Callback = function(Value)
-        AimbotEnabled = Value
+        SilentAimEnabled = Value
         if not Value then
             TargetPlayer = nil
         end
@@ -196,9 +225,9 @@ CombatTab:CreateToggle({
 
 CombatTab:CreateSlider({
     Name = "FOV Radius",
-    Range = {100, 400},
+    Range = {100, 300},
     Increment = 10,
-    CurrentValue = 200,
+    CurrentValue = 150,
     Flag = "FOV_Radius",
     Callback = function(Value)
         FOVRadius = Value
@@ -254,45 +283,59 @@ function UpdateESPColors()
     end
 end
 
--- Hitbox Expander - Ép kích thước Head và HumanoidRootPart
+-- Hitbox Expander - Anti-Kick Version (Chỉ HumanoidRootPart)
 function ExpandHitboxes()
     for _, Player in pairs(Players:GetPlayers()) do
         if Player ~= LocalPlayer and Player.Character then
             local Character = Player.Character
-            local Head = Character:FindFirstChild("Head")
             local RootPart = Character:FindFirstChild("HumanoidRootPart")
             
-            if Head then
-                Head.Size = Vector3.new(20, 20, 20)
-                Head.Transparency = 0.5
-                Head.BrickColor = BrickColor.new("Really red")
-                Head.CanCollide = false
-                Head.Material = Enum.Material.ForceField
-            end
-            
             if RootPart then
-                RootPart.Size = Vector3.new(20, 20, 20)
-                RootPart.Transparency = 0.5
+                -- Lưu kích thước gốc nếu chưa có
+                if not OriginalHitboxSizes[Player] then
+                    OriginalHitboxSizes[Player] = RootPart.Size
+                end
+                
+                -- Anti-Kick properties
+                RootPart.Size = Vector3.new(12, 12, 12) -- Kích thước 12 như yêu cầu
+                RootPart.CanCollide = false -- Quan trọng: không va chạm vật lý
+                RootPart.Massless = true -- Quan trọng: không trọng lượng
+                RootPart.CanQuery = true -- Quan trọng: vẫn nhận đạn
+                RootPart.Transparency = 0.7 -- Hơi trong suốt để thấy
                 RootPart.BrickColor = BrickColor.new("Really red")
-                RootPart.CanCollide = false
                 RootPart.Material = Enum.Material.ForceField
             end
         end
     end
 end
 
--- Aimbot với FOV
+function RestoreHitboxes()
+    for Player, OriginalSize in pairs(OriginalHitboxSizes) do
+        if Player.Character then
+            local RootPart = Player.Character:FindFirstChild("HumanoidRootPart")
+            if RootPart and OriginalSize then
+                RootPart.Size = OriginalSize
+                RootPart.CanCollide = true
+                RootPart.Massless = false
+                RootPart.Transparency = 0
+                RootPart.Material = Enum.Material.Plastic
+            end
+        end
+    end
+    OriginalHitboxSizes = {}
+end
+
+-- Silent Aim với FOV
 function GetNearestPlayerInFOV()
     local NearestPlayer = nil
     local NearestDistance = math.huge
-    local Camera = workspace.CurrentCamera
     
     for _, Player in pairs(Players:GetPlayers()) do
         if Player ~= LocalPlayer and Player.Character then
             local Character = Player.Character
-            local Head = Character:FindFirstChild("Head")
-            if Head then
-                local Vector, OnScreen = Camera:WorldToScreenPoint(Head.Position)
+            local RootPart = Character:FindFirstChild("HumanoidRootPart")
+            if RootPart then
+                local Vector, OnScreen = Camera:WorldToScreenPoint(RootPart.Position)
                 if OnScreen then
                     local MousePosition = UserInputService:GetMouseLocation()
                     local Distance = (Vector2.new(Vector.X, Vector.Y) - MousePosition).Magnitude
@@ -309,18 +352,6 @@ function GetNearestPlayerInFOV()
     return NearestPlayer
 end
 
-function Aimbot()
-    if AimbotEnabled then
-        TargetPlayer = GetNearestPlayerInFOV()
-        if TargetPlayer and TargetPlayer.Character then
-            local Head = TargetPlayer.Character:FindFirstChild("Head")
-            if Head then
-                workspace.CurrentCamera.CFrame = CFrame.new(workspace.CurrentCamera.CFrame.Position, Head.Position)
-            end
-        end
-    end
-end
-
 function UpdateFOVSize()
     local FOVGui = game:GetService("CoreGui"):FindFirstChild("FOVCircle")
     if FOVGui then
@@ -334,13 +365,10 @@ end
 
 -- RenderStepped loop - Tối ưu cho Mobile
 RunService.RenderStepped:Connect(function()
-    -- Hitbox Expander - Luôn ép kích thước
+    -- Hitbox Expander - Luôn ép kích thước (Anti-Kick)
     if HitboxExpanderEnabled then
         ExpandHitboxes()
     end
-    
-    -- Aimbot
-    Aimbot()
 end)
 
 -- Player events
@@ -359,6 +387,11 @@ Players.PlayerRemoving:Connect(function(Player)
             ESPHighlights[Player].Highlight:Destroy()
         end
         ESPHighlights[Player] = nil
+    end
+    
+    -- Restore hitbox khi player thoát
+    if OriginalHitboxSizes[Player] then
+        OriginalHitboxSizes[Player] = nil
     end
     
     -- Xóa target nếu là người chơi đã thoát
@@ -400,9 +433,10 @@ Rayfield:Notify({
     Image = 4483362458,
 })
 
-print("📱 Mobile Client Utility Tool đã được tải!")
+print("📱 Mobile Client Utility Tool - Anti-Kick Version đã được tải!")
 print("🎯 Tính năng:")
 print("- Nút kéo thả để mở/đóng menu")
 print("- Player ESP tối ưu")
-print("- Hitbox Expander (20x20x20)")
-print("- FOV Aimbot Auto Lock")
+print("- Hitbox Expander (12x12x12) Anti-Kick")
+print("- Silent Aim FOV (Không khóa camera)")
+print("- CanCollide = false, Massless = true, CanQuery = true")
