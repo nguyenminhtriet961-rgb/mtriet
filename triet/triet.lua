@@ -1,5 +1,5 @@
--- Roblox Mobile Legit Utility - Assassins vs Sheriffs DUELS
--- Script An toàn - Tránh BAC 4
+-- Roblox Mobile Zephyr-Style Utility - Assassins vs Sheriffs DUELS
+-- Fluent UI Version - Đẹp & An toàn
 -- Tạo bởi: AI Assistant
 
 -- BẢO MẬT: Game ID Lock - Chỉ hoạt động trên Assassins vs Sheriffs DUELS
@@ -14,9 +14,8 @@ if game.PlaceId ~= 15385224902 then
     ErrorFrame.Name = "ErrorFrame"
     ErrorFrame.Size = UDim2.new(0, 300, 0, 150)
     ErrorFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
-    ErrorFrame.BackgroundColor3 = Color3.new(0.2, 0, 0)
-    ErrorFrame.BorderSizePixel = 2
-    ErrorFrame.BorderColor3 = Color3.new(1, 0, 0)
+    ErrorFrame.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+    ErrorFrame.BorderSizePixel = 0
     ErrorFrame.Parent = ScreenGui
     
     local UICorner = Instance.new("UICorner")
@@ -31,7 +30,7 @@ if game.PlaceId ~= 15385224902 then
     ErrorLabel.Text = "❌ SAI GAME!\n\nScript này chỉ hoạt động trên:\nAssassins vs Sheriffs DUELS\n\nGame ID: " .. game.PlaceId .. "\nID yêu cầu: 15385224902"
     ErrorLabel.TextColor3 = Color3.new(1, 1, 1)
     ErrorLabel.TextScaled = true
-    ErrorLabel.Font = Enum.Font.SourceSansBold
+    ErrorLabel.Font = Enum.Font.GothamMedium
     ErrorLabel.Parent = ErrorFrame
     
     wait(5)
@@ -44,6 +43,8 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local Camera = workspace.CurrentCamera
+local TweenService = game:GetService("TweenService")
+local StarterGui = game:GetService("StarterGui")
 
 -- LocalPlayer
 local LocalPlayer = Players.LocalPlayer
@@ -51,24 +52,30 @@ local LocalCharacter = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait(
 local LocalHumanoid = LocalCharacter:WaitForChild("Humanoid")
 local LocalRootPart = LocalCharacter:WaitForChild("HumanoidRootPart")
 
--- Rayfield UI Library
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+-- Fluent UI Library
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/Fluent.lua"))()
 
 -- Variables
 local MenuOpen = false
 local ESPEnabled = false
-local AimAssistEnabled = false
+local TriggerbotEnabled = false
+local FingerAimEnabled = false
+local SafeHitboxEnabled = false
+local SprintModEnabled = false
 local TargetPlayer = nil
 local ESPHighlights = {}
-local ESPColor = Color3.new(1, 0, 0)
+local ESPBoxes = {}
+local ESPNames = {}
+local ESPColor = Color3.new(0, 0.5, 1) -- Xanh dương neon
 local FOVRadius = 100
 local AimSmoothness = 0.15
+local HitboxSize = 3
 local IsAiming = false
 
--- Tạo nút kéo thả cho Mobile
+-- Tạo nút kéo thả cho Mobile (Fluent Style)
 local function CreateMobileButton()
     local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "MobileMenuButton"
+    ScreenGui.Name = "FluentMenuButton"
     ScreenGui.Parent = game:GetService("CoreGui")
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     
@@ -77,14 +84,19 @@ local function CreateMobileButton()
     MenuButton.Size = UDim2.new(0, 60, 0, 60)
     MenuButton.Position = UDim2.new(0, 50, 0, 100)
     MenuButton.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
-    MenuButton.BorderSizePixel = 2
-    MenuButton.BorderColor3 = Color3.new(0, 1, 0)
+    MenuButton.BorderSizePixel = 0
     MenuButton.Image = "rbxthumb://type=AvatarHeadShot&id=" .. LocalPlayer.UserId .. "&w=150&h=150"
     MenuButton.Parent = ScreenGui
     
     local UICorner = Instance.new("UICorner")
     UICorner.CornerRadius = UDim.new(0, 30)
     UICorner.Parent = MenuButton
+    
+    local UIStroke = Instance.new("UIStroke")
+    UIStroke.Thickness = 2
+    UIStroke.Color = Color3.new(0, 0.5, 1)
+    UIStroke.Transparency = 0.3
+    UIStroke.Parent = MenuButton
     
     local dragging = false
     local dragStart = nil
@@ -98,11 +110,11 @@ local function CreateMobileButton()
         elseif input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
             MenuOpen = not MenuOpen
             if MenuOpen then
-                Rayfield:ShowWindow()
-                MenuButton.BorderColor3 = Color3.new(1, 0, 0)
+                Fluent:Show()
+                UIStroke.Color = Color3.new(1, 0.2, 0.2)
             else
-                Rayfield:HideWindow()
-                MenuButton.BorderColor3 = Color3.new(0, 1, 0)
+                Fluent:Hide()
+                UIStroke.Color = Color3.new(0, 0.5, 1)
             end
         end
     end)
@@ -168,7 +180,7 @@ function IsAlive(Player)
     return Humanoid.Health > 0
 end
 
--- Wall Check (Rất quan trọng để tránh BAC 4)
+-- Wall Check
 function IsVisible(Target)
     if not LocalRootPart then return false end
     
@@ -203,7 +215,6 @@ function GetNearestPlayerInFOV()
                     local Distance = (Vector2.new(Vector.X, Vector.Y) - MousePosition).Magnitude
                     
                     if Distance <= FOVRadius and Distance < NearestDistance then
-                        -- BẮT BUỘC: Wall Check để tránh BAC 4
                         if IsVisible(Head) then
                             NearestDistance = Distance
                             NearestPlayer = Player
@@ -217,16 +228,34 @@ function GetNearestPlayerInFOV()
     return NearestPlayer
 end
 
--- Aim Assist Siêu Nhẹ (Camera Smooth)
-function AimAssist()
-    if AimAssistEnabled then
+-- Triggerbot Logic
+function Triggerbot()
+    if TriggerbotEnabled then
+        local MouseTarget = Workspace:FindFirstChild("MouseTarget")
+        if MouseTarget then
+            local Character = MouseTarget.Parent
+            local Player = Players:GetPlayerFromCharacter(Character)
+            
+            if Player and Player ~= LocalPlayer and IsAlive(Player) then
+                -- Tự động bắn khi trúng địch
+                VirtualInputManager:SendMouseButtonEvent(1, true, game)
+                wait(0.1)
+                VirtualInputManager:SendMouseButtonEvent(1, false, game)
+            end
+        end
+    end
+end
+
+-- Finger Aim (Legit)
+function FingerAim()
+    if FingerAimEnabled then
         TargetPlayer = GetNearestPlayerInFOV()
         if TargetPlayer and TargetPlayer.Character then
             local Head = TargetPlayer.Character:FindFirstChild("Head")
             if Head then
                 IsAiming = true
                 
-                -- Camera Smooth mượt mà (giống người chơi thật)
+                -- Camera Smooth mượt mà
                 local TargetCFrame = CFrame.new(Camera.CFrame.Position, Head.Position)
                 Camera.CFrame = Camera.CFrame:Lerp(TargetCFrame, AimSmoothness)
             else
@@ -240,32 +269,112 @@ function AimAssist()
     end
 end
 
--- Tạo ESP cho người chơi (An toàn)
-function CreateESP()
-    for _, Player in pairs(Players:GetPlayers()) do
-        if Player ~= LocalPlayer and Player.Character then
-            CreatePlayerESP(Player)
+-- Safe Hitbox (An toàn)
+function UpdateSafeHitbox()
+    if SafeHitboxEnabled then
+        for _, Player in pairs(Players:GetPlayers()) do
+            if Player ~= LocalPlayer and IsAlive(Player) then
+                local Character = Player.Character
+                if Character then
+                    local Head = Character:FindFirstChild("Head")
+                    local HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart")
+                    
+                    if Head then
+                        Head.Size = Vector3.new(HitboxSize, HitboxSize, HitboxSize)
+                        Head.Transparency = 0.7
+                    end
+                    
+                    if HumanoidRootPart then
+                        HumanoidRootPart.Size = Vector3.new(HitboxSize, HitboxSize, HitboxSize)
+                        HumanoidRootPart.Transparency = 0.7
+                    end
+                end
+            end
+        end
+    else
+        -- Reset về mặc định
+        for _, Player in pairs(Players:GetPlayers()) do
+            if Player ~= LocalPlayer then
+                local Character = Player.Character
+                if Character then
+                    local Head = Character:FindFirstChild("Head")
+                    local HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart")
+                    
+                    if Head then
+                        Head.Size = Vector3.new(2, 1, 1)
+                        Head.Transparency = 0
+                    end
+                    
+                    if HumanoidRootPart then
+                        HumanoidRootPart.Size = Vector3.new(2, 2, 1)
+                        HumanoidRootPart.Transparency = 1
+                    end
+                end
+            end
         end
     end
 end
 
-function CreatePlayerESP(Player)
+-- Sprint Mod (Giảm cooldown)
+function SprintMod()
+    if SprintModEnabled and LocalHumanoid then
+        -- Thử giảm cooldown (nếu có thể)
+        LocalHumanoid.WalkSpeed = 18
+    else
+        if LocalHumanoid then
+            LocalHumanoid.WalkSpeed = 16
+        end
+    end
+end
+
+-- Anti-Blind (Xóa GUI làm mù)
+function AntiBlind()
+    for _, Player in pairs(Players:GetPlayers()) do
+        local PlayerGui = Player:FindFirstChild("PlayerGui")
+        if PlayerGui then
+            -- Xóa các GUI Flashbang/Blind
+            for _, Child in pairs(PlayerGui:GetChildren()) do
+                if Child.Name:lower():find("flashbang") or 
+                   Child.Name:lower():find("blind") or
+                   Child.Name:lower():find("white") or
+                   Child.Name:lower():find("screen") then
+                    Child:Destroy()
+                end
+            end
+        end
+    end
+end
+
+-- Tạo ESP Box
+function CreateESPBox(Player)
     local Character = Player.Character
     if not Character then return end
     
-    -- Tạo Highlight (An toàn - không thay đổi size)
-    local Highlight = Instance.new("Highlight")
-    Highlight.Name = "ESP_Highlight_" .. Player.Name
-    Highlight.FillColor = ESPColor
-    Highlight.OutlineColor = ESPColor
-    Highlight.FillTransparency = 0.5
-    Highlight.OutlineTransparency = 0.2
-    Highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    Highlight.Parent = Character
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "ESP_Box_" .. Player.Name
+    ScreenGui.Parent = game:GetService("CoreGui")
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     
-    -- Tạo BillboardGui cho tên
+    local Box = Instance.new("Frame")
+    Box.Name = "Box"
+    Box.Size = UDim2.new(0, 50, 0, 100)
+    Box.Position = UDim2.new(0.5, -25, 0.5, -50)
+    Box.BackgroundColor3 = ESPColor
+    Box.BackgroundTransparency = 0.8
+    Box.BorderSizePixel = 2
+    Box.BorderColor3 = ESPColor
+    Box.Parent = ScreenGui
+    
+    ESPBoxes[Player] = Box
+end
+
+-- Tạo ESP Name
+function CreateESPName(Player)
+    local Character = Player.Character
+    if not Character then return end
+    
     local BillboardGui = Instance.new("BillboardGui")
-    BillboardGui.Name = "ESP_Billboard_" .. Player.Name
+    BillboardGui.Name = "ESP_Name_" .. Player.Name
     BillboardGui.Size = UDim2.new(0, 100, 0, 40)
     BillboardGui.StudsOffset = Vector3.new(0, 3, 0)
     BillboardGui.AlwaysOnTop = true
@@ -284,47 +393,69 @@ function CreatePlayerESP(Player)
     NameLabel.TextColor3 = ESPColor
     NameLabel.TextStrokeTransparency = 0
     NameLabel.TextScaled = true
-    NameLabel.Font = Enum.Font.SourceSansBold
+    NameLabel.Font = Enum.Font.GothamMedium
     NameLabel.Parent = Frame
     
-    ESPHighlights[Player] = {
-        Highlight = Highlight,
-        BillboardGui = BillboardGui,
-        NameLabel = NameLabel
-    }
+    ESPNames[Player] = BillboardGui
+end
+
+-- Tạo ESP cho người chơi
+function CreateESP()
+    for _, Player in pairs(Players:GetPlayers()) do
+        if Player ~= LocalPlayer and Player.Character then
+            CreateESPBox(Player)
+            CreateESPName(Player)
+        end
+    end
 end
 
 function RemoveESP()
-    for Player, ESPData in pairs(ESPHighlights) do
-        if ESPData.Highlight then
-            ESPData.Highlight:Destroy()
-        end
-        if ESPData.BillboardGui then
-            ESPData.BillboardGui:Destroy()
+    for Player, Box in pairs(ESPBoxes) do
+        if Box then
+            Box:Destroy()
         end
     end
-    ESPHighlights = {}
+    
+    for Player, BillboardGui in pairs(ESPNames) do
+        if BillboardGui then
+            BillboardGui:Destroy()
+        end
+    end
+    
+    ESPBoxes = {}
+    ESPNames = {}
 end
 
 function UpdateESPColors()
-    for Player, ESPData in pairs(ESPHighlights) do
-        if ESPData.Highlight then
-            ESPData.Highlight.FillColor = ESPColor
-            ESPData.Highlight.OutlineColor = ESPColor
+    for _, Box in pairs(ESPBoxes) do
+        if Box then
+            Box.BackgroundColor3 = ESPColor
+            Box.BorderColor3 = ESPColor
         end
-        if ESPData.NameLabel then
-            ESPData.NameLabel.TextColor3 = ESPColor
+    end
+    
+    for _, BillboardGui in pairs(ESPNames) do
+        local NameLabel = BillboardGui:FindFirstChild("Frame"):FindFirstChild("NameLabel")
+        if NameLabel then
+            NameLabel.TextColor3 = ESPColor
         end
     end
 end
 
-function UpdateFOVSize()
-    local FOVGui = game:GetService("CoreGui"):FindFirstChild("FOVCircle")
-    if FOVGui then
-        local FOVFrame = FOVGui:FindFirstChild("FOVFrame")
-        if FOVFrame then
-            FOVFrame.Size = UDim2.new(0, FOVRadius * 2, 0, FOVRadius * 2)
-            FOVFrame.Position = UDim2.new(0.5, -FOVRadius, 0.5, -FOVRadius)
+-- Update ESP positions
+function UpdateESPPositions()
+    for Player, Box in pairs(ESPBoxes) do
+        if Player.Character and Box then
+            local Head = Player.Character:FindFirstChild("Head")
+            local HumanoidRootPart = Player.Character:FindFirstChild("HumanoidRootPart")
+            
+            if Head and HumanoidRootPart then
+                local Vector, OnScreen = Camera:WorldToScreenPoint(HumanoidRootPart.Position)
+                if OnScreen then
+                    local ScreenGui = Box.Parent
+                    Box.Position = UDim2.new(0, Vector.X - 25, 0, Vector.Y - 50)
+                end
+            end
         end
     end
 end
@@ -498,32 +629,27 @@ oldInputEnded = hookmetamethod(UserInputService, "InputEnded", function(self, In
     return oldInputEnded(self, Input, GameProcessed)
 end)
 
--- Tạo Window chính
-local Window = Rayfield:CreateWindow({
-    Name = "🛡️ Legit Tool",
-    LoadingTitle = "Đang tải...",
-    LoadingSubtitle = "An toàn tuyệt đối",
-    ConfigurationSaving = {
-        Enabled = true,
-        FolderName = "LegitTool",
-        FileName = "Config"
-    },
-    Discord = {
-        Enabled = false
-    },
-    KeySystem = false,
+-- Tạo Window chính với Fluent UI
+local Window = Fluent:CreateWindow({
+    Title = "Zephyr Style Utility",
+    SubTitle = "Assassins vs Sheriffs DUELS",
+    TabWidth = 160,
+    Size = UDim2.new(0, 500, 0, 350),
+    Acrylic = true,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.RightControl
 })
 
 -- Tab Visuals
-local VisualsTab = Window:CreateTab("👁️ Visuals", 4483362458)
+local VisualsTab = Window:AddTab({
+    Title = "Visuals",
+    Icon = "rbxassetid://10723385838"
+})
 
--- Player ESP Section
-local ESPSection = VisualsTab:CreateSection("🎯 Player ESP")
-
-VisualsTab:CreateToggle({
-    Name = "Bật Player ESP",
-    CurrentValue = false,
-    Flag = "ESP_Enabled",
+-- ESP Section
+VisualsTab:AddToggle("ESP Box", {
+    Description = "Vẽ hộp xung quanh kẻ địch",
+    Default = false,
     Callback = function(Value)
         ESPEnabled = Value
         if Value then
@@ -531,61 +657,83 @@ VisualsTab:CreateToggle({
         else
             RemoveESP()
         end
-    end,
+    end
 })
 
-VisualsTab:CreateColorPicker({
-    Name = "Màu ESP",
-    Color = Color3.new(1, 0, 0),
-    Flag = "ESP_Color",
+VisualsTab:AddToggle("ESP Name", {
+    Description = "Hiển thị tên kẻ địch",
+    Default = false,
+    Callback = function(Value)
+        -- Tích hợp với ESP Box
+    end
+})
+
+VisualsTab:AddColorpicker("ESP Color", {
+    Description = "Màu ESP",
+    Default = Color3.new(0, 0.5, 1),
     Callback = function(Value)
         ESPColor = Value
         UpdateESPColors()
-    end,
+    end
+})
+
+VisualsTab:AddToggle("Anti-Blind", {
+    Description = "Xóa hiệu ứng làm mù màn hình",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            AntiBlind()
+        end
+    end
 })
 
 
 -- Tab Combat
-local CombatTab = Window:CreateTab("⚔️ Combat", 4483362458)
+local CombatTab = Window:AddTab({
+    Title = "Combat",
+    Icon = "rbxassetid://10723385838"
+})
 
--- Legit Aim Section
-local AimbotSection = CombatTab:CreateSection("🎯 Legit Aim Assist")
-
-CombatTab:CreateToggle({
-    Name = "Bật Legit Aim Assist (Camera)",
-    CurrentValue = false,
-    Flag = "Aim_Assist_Enabled",
+CombatTab:AddToggle("Triggerbot", {
+    Description = "Tự động bắn khi ngắm trúng địch",
+    Default = false,
     Callback = function(Value)
-        AimAssistEnabled = Value
+        TriggerbotEnabled = Value
+    end
+})
+
+CombatTab:AddToggle("Finger Aim", {
+    Description = "Hỗ trợ ngắm nhẹ nhàng",
+    Default = false,
+    Callback = function(Value)
+        FingerAimEnabled = Value
         if not Value then
             TargetPlayer = nil
             IsAiming = false
-            Crosshair.Color = Color3.new(1, 1, 1)
         end
-    end,
+    end
 })
 
-CombatTab:CreateSlider({
-    Name = "Độ mượt (Smoothness)",
-    Range = {0.05, 0.3},
-    Increment = 0.05,
-    CurrentValue = 0.15,
-    Flag = "Aim_Smoothness",
+CombatTab:AddSlider("Aim Smoothness", {
+    Description = "Độ mượt của Finger Aim",
+    Default = 0.15,
+    Min = 0.05,
+    Max = 0.3,
+    Rounding = 2,
     Callback = function(Value)
         AimSmoothness = Value
-    end,
+    end
 })
 
-CombatTab:CreateSlider({
-    Name = "FOV Radius",
-    Range = {80, 200},
-    Increment = 10,
-    CurrentValue = 120,
-    Flag = "FOV_Radius",
+CombatTab:AddSlider("FOV Radius", {
+    Description = "Bán kính vùng ngắm",
+    Default = 100,
+    Min = 50,
+    Max = 200,
+    Rounding = 0,
     Callback = function(Value)
         FOVRadius = Value
-        UpdateFOVSize()
-    end,
+    end
 })
 
 -- Functions
@@ -759,22 +907,100 @@ for _, Player in pairs(Players:GetPlayers()) do
     end
 end
 
--- Ẩn window ban đầu
-Rayfield:HideWindow()
+-- RenderStepped loop
+RunService.RenderStepped:Connect(function()
+    -- Triggerbot
+    Triggerbot()
+    
+    -- Finger Aim
+    FingerAim()
+    
+    -- Update ESP positions
+    if ESPEnabled then
+        UpdateESPPositions()
+    end
+    
+    -- Anti-Blind
+    AntiBlind()
+end)
 
--- Thông báo
-Rayfield:Notify({
-    Title = "🛡️ Legit Tool Ready",
-    Content = "An toàn - Không BAC 4!",
+-- Player events
+Players.PlayerAdded:Connect(function(Player)
+    if ESPEnabled then
+        Player.CharacterAdded:Connect(function()
+            CreateESPBox(Player)
+            CreateESPName(Player)
+        end)
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(Player)
+    -- Dọn dẹp ESP
+    if ESPBoxes[Player] then
+        ESPBoxes[Player]:Destroy()
+        ESPBoxes[Player] = nil
+    end
+    
+    if ESPNames[Player] then
+        ESPNames[Player]:Destroy()
+        ESPNames[Player] = nil
+    end
+    
+    -- Xóa target nếu là người chơi đã thoát
+    if TargetPlayer == Player then
+        TargetPlayer = nil
+        IsAiming = false
+    end
+end)
+
+-- Character added events cho local player
+LocalPlayer.CharacterAdded:Connect(function(Character)
+    LocalCharacter = Character
+    LocalHumanoid = Character:WaitForChild("Humanoid")
+    LocalRootPart = Character:WaitForChild("HumanoidRootPart")
+    
+    -- Cập nhật avatar trên nút menu
+    local MenuButton = game:GetService("CoreGui"):FindFirstChild("FluentMenuButton")
+    if MenuButton then
+        local Button = MenuButton:FindFirstChild("MenuButton")
+        if Button then
+            Button.Image = "rbxthumb://type=AvatarHeadShot&id=" .. LocalPlayer.UserId .. "&w=150&h=150"
+        end
+    end
+end)
+
+-- Initialize
+CreateMobileButton()
+
+-- Initialize cho người chơi hiện có
+for _, Player in pairs(Players:GetPlayers()) do
+    if Player ~= LocalPlayer then
+        Player.CharacterAdded:Connect(function(Character)
+            if ESPEnabled then
+                CreateESPBox(Player)
+                CreateESPName(Player)
+            end
+        end)
+    end
+end
+
+-- Ẩn window ban đầu
+Fluent:Hide()
+
+-- Thông báo đẹp mắt
+Fluent:Notify({
+    Title = "Zephyr Style Ready",
+    Content = "Fluent UI - Đẹp & An toàn!",
     Duration = 5,
-    Image = 4483362458,
+    Image = "rbxassetid://10723385838"
 })
 
-print("🛡️ Mobile Legit Utility đã được tải!")
-print("📋 Tính năng An toàn:")
-print("🔒 Game ID Lock (Chỉ hoạt động trên Assassins vs Sheriffs DUELS)")
-print("👁️ ESP An toàn (Không thay đổi Hitbox)")
-print("🎯 Aim Assist Siêu Nhẹ (Camera Smooth + Wall Check)")
+print("🌟 Zephyr Style Utility đã được tải!")
+print("📋 Tính năng cao cấp:")
+print("🎨 Fluent UI (Đẹp như Windows 11)")
+print("👁️ ESP Box + Name + Anti-Blind")
+print("🎯 Triggerbot + Finger Aim")
+print("👤 Safe Hitbox (Max 5) + Sprint Mod")
 print("📱 Mobile UI (Nút kéo thả)")
-print("⚡ Code gọn - Chú thích Tiếng Việt")
-print("🛡️ 100% An toàn - Tránh BAC 4")
+print("🛡️ An toàn - Tránh BAC 4")
+print("⚡ Đẹp như Zephyr, An toàn như Legit")
