@@ -153,8 +153,8 @@ end
 -- Lấy avatar người chơi chính xác (hỗ trợ cả Rayfield và UI dự phòng)
 local function getPlayerAvatar()
     local success, avatarImage = pcall(function()
-        -- Thử phương pháp mới với rbxthumb://
-        return "rbxthumb://type=avatar&id=" .. player.UserId .. "&w=150&h=150"
+        -- Sử dụng AvatarHeadShot để lấy ảnh khuôn mặt
+        return "rbxthumb://type=AvatarHeadShot&id=" .. player.UserId .. "&w=150&h=150"
     end)
     
     if not success then
@@ -511,7 +511,7 @@ local function autoCastSkills()
     lastSkillTime = tick()
 end
 
--- Tấn công kẻ địch (hỗ trợ cả Mobile)
+-- Tấn công kẻ địch (hỗ trợ cả Mobile) - Tối ưu khoảng cách
 local function attackEnemy(enemy)
     if not enemy or not enemy:FindFirstChild("Humanoid") then
         return false
@@ -526,9 +526,21 @@ local function attackEnemy(enemy)
     -- Kiểm tra dừng khẩn cấp
     if _G.StopFarm then return false end
     
-    -- Di chuyển đến vị trí tấn công
-    local attackPos = enemy.PrimaryPart.Position + Vector3.new(0, 5, 0)
-    character.HumanoidRootPart.CFrame = CFrame.new(attackPos)
+    -- Tính khoảng cách đến quái
+    local distance = (character.HumanoidRootPart.Position - enemy.PrimaryPart.Position).Magnitude
+    
+    -- Tối ưu di chuyển: chỉ teleport khi xa, xoay mặt khi gần
+    if distance > 5 then
+        -- Di chuyển đến vị trí tấn công
+        local attackPos = enemy.PrimaryPart.Position + Vector3.new(0, 5, 0)
+        character.HumanoidRootPart.CFrame = CFrame.new(attackPos)
+    else
+        -- Nếu gần, chỉ cần xoay mặt về phía quái để tránh giật
+        character.HumanoidRootPart.CFrame = CFrame.new(
+            character.HumanoidRootPart.Position,
+            enemy.PrimaryPart.Position
+        )
+    end
     
     -- Tấn công với nhiều phương pháp
     local combatRemotes = {
@@ -873,28 +885,60 @@ local function createUI()
             Name = "Tự động Farm",
             CurrentValue = false,
             Flag = "AutoFarm",
-            Callback = function(Value) Config.AutoFarm = Value end,
+            Callback = function(Value) 
+                Config.AutoFarm = Value
+                -- Tự động lưu trạng thái
+                pcall(function()
+                    if Rayfield and Rayfield.SaveConfiguration then
+                        Rayfield.SaveConfiguration()
+                    end
+                end)
+            end,
         })
         
         FarmTab:CreateToggle({
             Name = "Tự động Nhận Quest",
             CurrentValue = false,
             Flag = "AutoQuest",
-            Callback = function(Value) Config.AutoQuest = Value end,
+            Callback = function(Value) 
+                Config.AutoQuest = Value
+                -- Tự động lưu trạng thái
+                pcall(function()
+                    if Rayfield and Rayfield.SaveConfiguration then
+                        Rayfield.SaveConfiguration()
+                    end
+                end)
+            end,
         })
         
         FarmTab:CreateToggle({
             Name = "Mob Aura",
             CurrentValue = false,
             Flag = "MobAura",
-            Callback = function(Value) Config.MobAura = Value end,
+            Callback = function(Value) 
+                Config.MobAura = Value
+                -- Tự động lưu trạng thái
+                pcall(function()
+                    if Rayfield and Rayfield.SaveConfiguration then
+                        Rayfield.SaveConfiguration()
+                    end
+                end)
+            end,
         })
         
         FarmTab:CreateToggle({
             Name = "Gom Quái",
             CurrentValue = false,
             Flag = "BringMobs",
-            Callback = function(Value) Config.BringMobs = Value end,
+            Callback = function(Value) 
+                Config.BringMobs = Value
+                -- Tự động lưu trạng thái
+                pcall(function()
+                    if Rayfield and Rayfield.SaveConfiguration then
+                        Rayfield.SaveConfiguration()
+                    end
+                end)
+            end,
         })
         
         FarmTab:CreateSlider({
@@ -960,14 +1004,30 @@ local function createUI()
             Name = "Aimbot (Khóa mục tiêu)",
             CurrentValue = false,
             Flag = "AimbotEnabled",
-            Callback = function(Value) Config.AimbotEnabled = Value end,
+            Callback = function(Value) 
+                Config.AimbotEnabled = Value
+                -- Tự động lưu trạng thái
+                pcall(function()
+                    if Rayfield and Rayfield.SaveConfiguration then
+                        Rayfield.SaveConfiguration()
+                    end
+                end)
+            end,
         })
         
         AimTab:CreateToggle({
             Name = "Tự động Chiêu (Z, X, C, V)",
             CurrentValue = true,
             Flag = "AutoSkills",
-            Callback = function(Value) Config.AutoSkills = Value end,
+            Callback = function(Value) 
+                Config.AutoSkills = Value
+                -- Tự động lưu trạng thái
+                pcall(function()
+                    if Rayfield and Rayfield.SaveConfiguration then
+                        Rayfield.SaveConfiguration()
+                    end
+                end)
+            end,
         })
         
         AimTab:CreateSlider({
@@ -986,7 +1046,15 @@ local function createUI()
             Name = "Chế độ An toàn (Chống ban)",
             CurrentValue = true,
             Flag = "SafeMode",
-            Callback = function(Value) Config.SafeMode = Value end,
+            Callback = function(Value) 
+                Config.SafeMode = Value
+                -- Tự động lưu trạng thái
+                pcall(function()
+                    if Rayfield and Rayfield.SaveConfiguration then
+                        Rayfield.SaveConfiguration()
+                    end
+                end)
+            end,
         })
         
         SettingsTab:CreateLabel("Tên người chơi: " .. player.Name)
