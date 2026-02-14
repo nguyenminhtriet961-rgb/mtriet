@@ -1,14 +1,10 @@
--- Roblox Mobile Client Utility Tool - Advanced Version
--- Tap-to-Shoot Silent Aim + Game ID Lock
+-- Roblox Mobile Ultimate Client Utility - Assassins vs Sheriffs DUELS
+-- Script hoàn chỉnh từ A đến Z - Tối ưu cho Mobile
 -- Tạo bởi: AI Assistant
 
--- BẢO MẬT: Game ID Lock - Chỉ hoạt động trên game đúng ID
+-- BẢO MẬT: Game ID Lock - Chỉ hoạt động trên Assassins vs Sheriffs DUELS
 if game.PlaceId ~= 15385224902 then
-    -- Hiện thông báo lỗi rồi crash game nếu không đúng game
-    local Players = game:GetService("Players")
-    local LocalPlayer = Players.LocalPlayer
-    
-    -- Tạo thông báo lỗi
+    -- Hiện thông báo lỗi rồi dừng hoạt động
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "ErrorMessage"
     ScreenGui.Parent = game:GetService("CoreGui")
@@ -16,15 +12,15 @@ if game.PlaceId ~= 15385224902 then
     
     local ErrorFrame = Instance.new("Frame")
     ErrorFrame.Name = "ErrorFrame"
-    ErrorFrame.Size = UDim2.new(0, 300, 0, 150)
-    ErrorFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
+    ErrorFrame.Size = UDim2.new(0, 350, 0, 180)
+    ErrorFrame.Position = UDim2.new(0.5, -175, 0.5, -90)
     ErrorFrame.BackgroundColor3 = Color3.new(0.2, 0, 0)
-    ErrorFrame.BorderSizePixel = 2
+    ErrorFrame.BorderSizePixel = 3
     ErrorFrame.BorderColor3 = Color3.new(1, 0, 0)
     ErrorFrame.Parent = ScreenGui
     
     local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UDim.new(0, 10)
+    UICorner.CornerRadius = UDim.new(0, 15)
     UICorner.Parent = ErrorFrame
     
     local ErrorLabel = Instance.new("TextLabel")
@@ -32,21 +28,18 @@ if game.PlaceId ~= 15385224902 then
     ErrorLabel.Size = UDim2.new(1, -20, 1, -20)
     ErrorLabel.Position = UDim2.new(0, 10, 0, 10)
     ErrorLabel.BackgroundTransparency = 1
-    ErrorLabel.Text = "❌ SAI GAME!\n\nScript này không hoạt động trên game này!\nGame ID: " .. game.PlaceId .. "\n\nVui lòng dùng đúng game!"
+    ErrorLabel.Text = "❌ SAI GAME!\n\nScript này chỉ hoạt động trên:\nAssassins vs Sheriffs DUELS\n\nGame ID hiện tại: " .. game.PlaceId .. "\nID yêu cầu: 15385224902\n\nVui lòng dùng đúng game!"
     ErrorLabel.TextColor3 = Color3.new(1, 1, 1)
     ErrorLabel.TextScaled = true
     ErrorLabel.Font = Enum.Font.SourceSansBold
+    ErrorLabel.TextWrapped = true
     ErrorLabel.Parent = ErrorFrame
     
-    -- Crash game sau 3 giây
-    wait(3)
-    while true do
-        game:Shutdown()
-        wait(0.1)
-    end
+    wait(5)
     return
 end
 
+-- Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -54,6 +47,7 @@ local Workspace = game:GetService("Workspace")
 local Camera = workspace.CurrentCamera
 local GuiService = game:GetService("GuiService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
+local HttpService = game:GetService("HttpService")
 
 -- LocalPlayer
 local LocalPlayer = Players.LocalPlayer
@@ -67,13 +61,26 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 -- Variables
 local MenuOpen = false
 local ESPEnabled = false
-local SilentAimEnabled = false
+local AimAssistEnabled = false
+local NoclipEnabled = false
 local TargetPlayer = nil
 local ESPHighlights = {}
 local ESPColor = Color3.new(1, 0, 0)
-local FOVRadius = 120 -- Bán kính FOV
-local LastTouchPosition = Vector2.new(0, 0)
-local IsTouching = false
+local FOVRadius = 150
+local AimSmoothness = 0.2
+local CrosshairSize = 5
+local CrosshairColor = Color3.new(1, 1, 1)
+local IsAiming = false
+
+-- Drawing cho Smart Crosshair
+local Crosshair = Drawing.new("Circle")
+Crosshair.Color = CrosshairColor
+Crosshair.Thickness = 2
+Crosshair.NumSides = 50
+Crosshair.Radius = CrosshairSize
+Crosshair.Filled = false
+Crosshair.Visible = true
+Crosshair.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
 -- Tạo nút kéo thả cho Mobile
 local function CreateMobileButton()
