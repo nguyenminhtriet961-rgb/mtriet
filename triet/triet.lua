@@ -2,9 +2,44 @@
 -- Tap-to-Shoot Silent Aim + Game ID Lock
 -- Tạo bởi: AI Assistant
 
--- BẢO MẬT: Game ID Lock - Chỉ hoạt động trên Assassins vs Sheriffs DUELS
-if game.PlaceId ~= 2095646309 then
-    -- Crash game ngay lập tức nếu không đúng game
+-- BẢO MẬT: Game ID Lock - Chỉ hoạt động trên game đúng ID
+if game.PlaceId ~= 15385224902 then
+    -- Hiện thông báo lỗi rồi crash game nếu không đúng game
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    
+    -- Tạo thông báo lỗi
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "ErrorMessage"
+    ScreenGui.Parent = game:GetService("CoreGui")
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    local ErrorFrame = Instance.new("Frame")
+    ErrorFrame.Name = "ErrorFrame"
+    ErrorFrame.Size = UDim2.new(0, 300, 0, 150)
+    ErrorFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
+    ErrorFrame.BackgroundColor3 = Color3.new(0.2, 0, 0)
+    ErrorFrame.BorderSizePixel = 2
+    ErrorFrame.BorderColor3 = Color3.new(1, 0, 0)
+    ErrorFrame.Parent = ScreenGui
+    
+    local UICorner = Instance.new("UICorner")
+    UICorner.CornerRadius = UDim.new(0, 10)
+    UICorner.Parent = ErrorFrame
+    
+    local ErrorLabel = Instance.new("TextLabel")
+    ErrorLabel.Name = "ErrorLabel"
+    ErrorLabel.Size = UDim2.new(1, -20, 1, -20)
+    ErrorLabel.Position = UDim2.new(0, 10, 0, 10)
+    ErrorLabel.BackgroundTransparency = 1
+    ErrorLabel.Text = "❌ SAI GAME!\n\nScript này không hoạt động trên game này!\nGame ID: " .. game.PlaceId .. "\n\nVui lòng dùng đúng game!"
+    ErrorLabel.TextColor3 = Color3.new(1, 1, 1)
+    ErrorLabel.TextScaled = true
+    ErrorLabel.Font = Enum.Font.SourceSansBold
+    ErrorLabel.Parent = ErrorFrame
+    
+    -- Crash game sau 3 giây
+    wait(3)
     while true do
         game:Shutdown()
         wait(0.1)
@@ -441,7 +476,7 @@ Rayfield:Notify({
 
 print("📱 Mobile Client Utility Tool - Advanced Version đã được tải!")
 print("🎯 Tính năng:")
-print("- Game ID Lock (Chỉ hoạt động trên Assassins vs Sheriffs DUELS)")
+print("- Game ID Lock (Chỉ hoạt động trên game ID: 15385224902)")
 print("- Tap-to-Shoot Silent Aim (Chạm bừa vẫn trúng đầu)")
 print("- Nút kéo thả để mở/đóng menu")
 print("- Player ESP (Box + Name, xuyên tường)")
